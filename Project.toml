@@ -1,0 +1,16 @@
+name = "CubicNewton"
+uuid = "0c568c97-1dfb-438d-a4b2-d21d63173d9f"
+authors = ["Cooper "]
+version = "0.1.0"
+
+[deps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+
+[targets]
+test = ["Test", "Flux"]
