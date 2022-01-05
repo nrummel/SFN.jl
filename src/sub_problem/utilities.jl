@@ -1,7 +1,8 @@
 #=
 Author: Cooper Simpson
 
-Utilities for working with the cubic newton optimizer.
+Associated functionality for solving the cubic sub-problem in
+cubic newton type methods.
 =#
 
 #=
@@ -59,11 +60,4 @@ function _cubic_eval(hvp, s, grads, σ)
     cubic_grad = g + Hs + σ*s_norm*s
 
     return cubic_val, cubic_grad
-end
-
-#=
-Tracks information
-=#
-mutable struct Logger
-    hvp_calls::Real
 end

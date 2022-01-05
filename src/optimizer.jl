@@ -4,7 +4,7 @@ Author: Cooper Simpson
 Main cubic newton optimization functionality.
 =#
 
-include("sub_problem.jl")
+include("sub_problem/sub_problem.jl")
 
 #=
 Cubic Newton optimizer definition
