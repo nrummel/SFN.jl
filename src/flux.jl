@@ -44,6 +44,6 @@ function Flux.Optimise.train!(model, _, data, opt::StochasticCubicNewton)
         subsample = selectdim(data, 1, rand(1:n, opt.hessian_sample_size))
 
         #make an update step
-        opt.optimizer(f, params, grads, _hvp(θ -> f(θ, subsample), params))
+        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subsample), params))
     end
 end

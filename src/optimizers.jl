@@ -20,7 +20,7 @@ Input:
     hess :: hessian function (defaults to forward over back AD)
 =#
 function minimize(opt::CubicNewtonOptimizer, f, x,
-                    grads=x -> gradient(f, x), hess=x -> _hvop(f, x),
+                    grads=x -> gradient(f, x), hess=x -> HVPOperator(f, x),
                     itmax=1e3)
     #iterate and update
     for i in 1:opt.itmax
