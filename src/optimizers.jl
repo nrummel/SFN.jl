@@ -5,15 +5,10 @@ Cubic Newton optimization functionality in the form of specific optimizers for
 each method of solving the subproblem and updating parameters.
 =#
 
-using Krylov: cg_lanczos
-
 #=
 Parent type for cubic Newton optimizers.
 =#
-abstract struct CubicNewtonOptimizer
-    ϵ::Float64
-    itmax::UInt16
-end
+abstract type CubicNewtonOptimizer end
 
 #=
 Minimize the given function according to the subtype update rule.
@@ -24,17 +19,19 @@ Input:
     grads :: gradient function (defaults to backward mode AD)
     hess :: hessian function (defaults to forward over back AD)
 =#
-function minimize(opt::CubicNewtonOptimizer, f, x, grads=x -> gradient(f, x), hess=x -> _hvop(f, x))
+function minimize(opt::CubicNewtonOptimizer, f, x,
+                    grads=x -> gradient(f, x), hess=x -> _hvop(f, x),
+                    itmax=1e3)
     #iterate and update
     for i in 1:opt.itmax
-        opt(f, x, grads(x), hess(x))
+        step(opt, f, x, grads(x), hess(x))
     end
 end
 
 #=
 Cubic Newton optimizer using shifted Lanczos-CG for solving the sub-problem.
 =#
-mutable struct ShiftedLanczosCG <: CubicNewtonOptimizer
+mutable struct ShiftedLanczosCG<:CubicNewtonOptimizer
     σ::Float32 #regularization parameter
     η₁::Float32 #unsuccessful update threshold
     η₂::Float32 #very successful update threshold
@@ -42,8 +39,8 @@ mutable struct ShiftedLanczosCG <: CubicNewtonOptimizer
     γ₂::Float32 #regularization increase factor
     λ::Vector{Float64} #shifts
 end
-ShiftedLanczosCG(σ=1, η₁=0.1, η₂=0.75, γ₁=0.1, γ₂=5.0, λ=[10.0^x for x in -15:1:15]) = begin
-    ShiftedLanczosCG(σ, η₁, η₂, γ₁, γ₂)
+ShiftedLanczosCG(σ=1.0, η₁=0.1, η₂=0.75, γ₁=0.1, γ₂=5.0) = begin
+    ShiftedLanczosCG(σ, η₁, η₂, γ₁, γ₂, [10.0^x for x in -15:1:15])
 end
 
 #=
@@ -55,7 +52,7 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function (opt::ShiftedLanczosCG)(f, x, grads, hess, last=f(x))
+function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     #solve sub-problem to yield descent direction s and minimum m
     (d, stats) = cg_lanczos(hess, -grads, opt.λ)
 
@@ -98,9 +95,10 @@ mutable struct Eigen <: CubicNewtonOptimizer
     η₂::Float32 #very successful update threshold
     γ₁::Float32 #regularization decrease factor
     γ₂::Float32 #regularization increase factor
+    dummy::Bool
 end
-Eigen(σ=1, η₁=0.1, η₂=0.75, γ₁=0.1, γ₂=5.0) = begin
-    Eigen(σ, η₁, η₂, γ₁, γ₂)
+Eigen(σ=1.0, η₁=0.1, η₂=0.75, γ₁=0.1, γ₂=5.0) = begin
+    Eigen(σ, η₁, η₂, γ₁, γ₂, true)
 end
 
 #=
@@ -112,7 +110,7 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function (opt::Eigen)(f, x, grads, hess)
+function step!(opt::Eigen, f, x, grads, hess)
     #solve sub-problem to yield descent direction s and minimum m
 
     #evaluate descent direction, adapt hyperparameters, update parameters

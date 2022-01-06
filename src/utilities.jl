@@ -6,39 +6,43 @@ cubic newton type methods.
 =#
 
 #=
-Builds a fast hessian vector product (hvp) function using forward-over-back AD
+Fast hessian vector product (hvp) function using forward-over-back AD
 
 Input:
 	f :: scalar valued function
 	x :: input to f
+	v :: vector
 =#
-function _hvop(f, x)
+function _hvp(f, x, v)
 	g = x -> gradient(f, x)[1]
-	H(v) = partials.(g(Dual.(params, v)), 1)
-
-	return H
+	return partials.(g(Dual.(params, v)), 1)
 end
 
 #=
 Builds in-place hvp function
 
 Input:
-	results :: result of hvp
+	result :: result of hvp
 	dual_cache1 :: cache for Dual.(inputs,v)
 	dual_cache2 :: cache for Dual.(inputs,v)
 	f :: scalar valued function
 	x :: input to f
 =#
-function _hvop!(results, dual_cache1, dual_cache2, f, x)
-	g = (dx, x) -> dx .= gradient(f, x)[1]
 
-	H(v) = begin
-		dual_cache1 .= Dual.(params, v)
-		g(dual_cache2, dual_cache1)
-		results .= partials.(dual_cache2, 1)
-	end
+mutable struct HVPOperator{F, T<:Number, I<:Integer}
+	f::F #scalar valued function
+	dual::Dual{T, T} #cache for Dual.(x,v)
+	size::I #size of operator
+	nprod::UInt16 #number of applications
+end
+HVPOperator(f, x) = HVPOperator(f, Dual.(x, similar(x)), size(x))
 
-	return H
+Base.eltype(op::HVPOperator{F, T, I}) where{F, T, I} = T
+Base.size(op::HVPOperator) = (op.size, op.size)
+
+function mul!(result::AbstractVector, op::HVPOperator, v::AbstractVector)
+	op.dual_cache1.values .= v
+	result .= partials.(gradient(op.f, op.dual)[1], 1)
 end
 
 #=
