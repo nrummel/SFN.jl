@@ -14,7 +14,8 @@ using ForwardDiff: partials, Dual
 
 export CubicNewtonOpt
 
-include("optimizer.jl")
+include("utilities.jl")
+include("optimizers.jl")
 
 #=
 If Flux is loaded then export compatability functions.
