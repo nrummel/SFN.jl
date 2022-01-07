@@ -54,6 +54,8 @@ Input:
 =#
 function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     #solve sub-problem to yield descent direction s and minimum m
+    #NOTE: I should maybe be passing check_curvature=true, also good idea to
+    #look at other optional arguments.
     (d, stats) = cg_lanczos(hess, -grads, opt.λ)
 
     #extract indices of shifts that resulted in a positive definite system

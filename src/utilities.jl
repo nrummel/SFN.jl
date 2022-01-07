@@ -14,35 +14,37 @@ Input:
 	v :: vector
 =#
 function _hvp(f, x, v)
-	g = x -> gradient(f, x)[1]
-	return partials.(g(Dual.(params, v)), 1)
+	return partials.(gradient(f, Dual.(x, v))[1], 1)
 end
 
 #=
-Builds in-place hvp function
-
-Input:
-	result :: result of hvp
-	dual_cache1 :: cache for Dual.(inputs,v)
-	dual_cache2 :: cache for Dual.(inputs,v)
-	f :: scalar valued function
-	x :: input to f
+In-place hvp operator compatible with Krylov.jl
 =#
-
-mutable struct HVPOperator{F, T<:Number, I<:Integer}
-	f::F #scalar valued function
-	dual::Dual{T, T} #cache for Dual.(x,v)
-	size::I #size of operator
-	nprod::UInt16 #number of applications
+mutable struct HvpOperator{F, T, I}
+	f::F
+	x::Vector{T}
+	dual_cache1::Vector{Dual{Nothing, T, 1}}
+	dual_cache2::Vector{Dual{Nothing, T, 1}}
+	size::I
+	nprod::UInt16
 end
-HVPOperator(f, x) = HVPOperator(f, Dual.(x, similar(x)), size(x))
 
-Base.eltype(op::HVPOperator{F, T, I}) where{F, T, I} = T
-Base.size(op::HVPOperator) = (op.size, op.size)
+function HvpOperator(f, x::AbstractVector)
+	cache1 = Dual.(x, similar(x))
+	cache2 = Dual.(x, similar(x))
+	return HvpOperator(f, x, cache1, cache2, size(x, 1), UInt16(0))
+end
 
-function mul!(result::AbstractVector, op::HVPOperator, v::AbstractVector)
-	op.dual_cache1.values .= v
-	result .= partials.(gradient(op.f, op.dual)[1], 1)
+Base.eltype(op::HvpOperator{F, T, I}) where{F, T, I} = T
+Base.size(op::HvpOperator) = (op.size, op.size)
+Base.:*(op::HvpOperator, v::AbstractVector) = _hvp(op.f, op.x, v)
+
+function LinearAlgebra.mul!(result::AbstractVector, op::HvpOperator, v::AbstractVector)
+	op.nprod += 1
+
+	g = (∇, x) -> ∇ .= gradient(op.f, x)[1]
+	op.dual_cache1 .= Dual.(op.x, v)
+	result .= partials.(g(op.dual_cache2, op.dual_cache1), 1)
 end
 
 #=

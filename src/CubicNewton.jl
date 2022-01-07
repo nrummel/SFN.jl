@@ -9,6 +9,7 @@ module CubicNewton
 Setup
 =#
 using Requires
+using LinearAlgebra
 using Zygote: gradient, withgradient
 using ForwardDiff: partials, Dual
 using Krylov: cg_lanczos
