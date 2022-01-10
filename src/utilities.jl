@@ -19,6 +19,10 @@ end
 
 #=
 In-place hvp operator compatible with Krylov.jl
+
+NOTE: Should maybe also add in some gradient config details as seen in ForwardDiff's
+documentation.
+NOTE: Krylov.jl will throw an error if T is not Float64
 =#
 mutable struct HvpOperator{F, T, I}
 	f::F
@@ -55,8 +59,8 @@ Input:
 	grads :: gradients
 	hess :: hessian operator
 =#
-function _quadratic_eval(s, grads, hess)
-	return dot(d, grads) + 0.5*dot(d, hess(d))
+function _quadratic_eval(d, grads, hess)
+	return dot(d, grads) + 0.5*dot(d, hess*d)
 end
 
 #=
@@ -68,6 +72,6 @@ Input:
 	hess :: hessian operator
 	σ :: cubic regularizer
 =#
-function _cubic_eval(s, grads, hess, σ)
-    return dot(d, grads) + 0.5*dot(d, hess(d)) + (σ/3)*norm(d)^3
+function _cubic_eval(d, grads, hess, σ)
+    return dot(d, grads) + 0.5*dot(d, hess*d) + (σ/3)*norm(d)^3
 end

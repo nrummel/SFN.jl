@@ -14,7 +14,7 @@ using Zygote: gradient, withgradient
 using ForwardDiff: partials, Dual
 using Krylov: cg_lanczos
 
-export ShiftedLanczosCG, Eigen
+export ShiftedLanczosCG, Eigen, minimize!
 
 include("utilities.jl")
 include("optimizers.jl")
