@@ -27,7 +27,7 @@ Because we extract the parameters from the model via a call to destructure, we
 assume that all parameters there are being updated, and we don't need the
 parameters passed in this function call.
 =#
-function Flux.Optimise.train!(model, _, data, opt::StochasticCubicNewton)
+function Flux.Optimise.train!(model, data, opt::StochasticCubicNewton)
     #construct function compatible with optimizer
     params, re = Flux.destructure(model)
     f(θ, x) = re(θ)(x)
