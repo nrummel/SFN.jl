@@ -1,50 +1,58 @@
 #=
+Author: Cooper Simpson
+
+Functionality for building and using dense NNs.
+=#
+
+using Flux: flatten, Dense, softmax, onecold, logitcrossentropy, params
+
+#=
 Build a simple dense NN with paramaters ≈ data points * over paramaterization factor.
 
 Input:
-    input_dim :: dimension of input
-    output_dim :: dimension of output
-    num_data :: number of training data points
-    op_factor :: over paramaterization factor
-    num_layers :: depth of network (optional)
+    inputDim :: dimension of input
+    outputDim :: dimension of output
+    numData :: number of training data points
+    opFactor :: over paramaterization factor
+    numLayers :: depth of network (optional)
 =#
-function build_dense(input_dim, output_dim, num_data, op_factor, num_layers=3)
-    params = num_data*op_factor #approx number of paramaters
-    hidden = ceil(params - params*(input_dim + output_dim))/num_layers) #hidden layer params
+# function build_dense(inputDim, outputDim, numData, opFactor, numLayers=3)
+#     #calculate dimensions so that each layer has approximately equal parameters
+#     params = ceil(Int, numData*opFactor/numLayers)
+#
+#     return model
+# end
 
-    model = Flux.Dense(input_dim, hidden, relu)
-    for i = 2:num_layers-1
-        model = Flux.Chain(model, Flux.Dense(hidden, hidden, relu))
-    end
-    model = Flux.Chain(model, Flux.Dense(hidden, output_dim))
-
-    return model
+function mnist_dense()
+    return Flux.Chain(flatten, Dense(28*28, 72, relu),
+                        Dense(72, 48, relu), Dense(48, 10))
 end
 
 #=
-Return model prediction
+Return model prediction.
 
 Input:
     model :: NN model
     x :: input data
 =#
-predict = (model, x) -> return Flux.softmax(model(x))
+predict(model, x) = softmax(model(x))
 
 #=
-Compute model accuracy on given data
+Compute model accuracy on given data.
 
 Input:
     model :: NN model
-    dataloader :: data loader
+    dataLoader :: data loader
     labels :: data labels
 =#
-function accuracy(model, dataloader, labels)
+function accuracy(model, dataLoader, labels)
     correct, total = 0, 0
-    for x, y in dataloader
-        ̂y = Flux.onehotbatch(predict(model, x), labels)
+    for (x, y) in dataLoader
+        pred = onecold(predict(model, x), labels)
 
         total += size(labels, 1)
-        correct += sum(̂y == y)
+        correct += sum(pred .== y)
+    end
 
     return correct/total
 end

@@ -11,7 +11,7 @@ Optimizer for stochastic cubic Newton type methods.
 =#
 mutable struct StochasticCubicNewton
     optimizer::CubicNewtonOptimizer
-    hessian_sample_size::UInt16
+    hessianSampleSize::UInt16
 end
 
 #=
@@ -27,23 +27,24 @@ Because we extract the parameters from the model via a call to destructure, we
 assume that all parameters there are being updated, and we don't need the
 parameters passed in this function call.
 =#
-function Flux.Optimise.train!(model, data, opt::StochasticCubicNewton)
+function Flux.Optimise.train!(model, _, data, opt::StochasticCubicNewton)
     #construct function compatible with optimizer
     params, re = Flux.destructure(model)
-    f(θ, x) = re(θ)(x)
+    f(θ, z) = re(θ)(z...)
 
     for batch in data
         #function of the parameters only
         f(θ) = θ -> f(θ, batch)
 
-        #compute gradients
-        loss, grads = withgradient(f, params)
-
         #extract sub-sampled batch for hvp
         n = size(data, 1)
-        subsample = selectdim(data, 1, rand(1:n, opt.hessian_sample_size))
+        subSample = selectdim(data, 1, rand(1:n, opt.hessianSampleSize))
+
+        #compute gradients
+        loss, back = pullback(f, params)
+        grads = back(one.(loss))
 
         #make an update step
-        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subsample), params))
+        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subSample), params), loss)
     end
 end

@@ -27,16 +27,16 @@ NOTE: Krylov.jl will throw an error if T is not Float64
 mutable struct HvpOperator{F, T, I}
 	f::F
 	x::Vector{T}
-	dual_cache1::Vector{Dual{Nothing, T, 1}}
-	dual_cache2::Vector{Dual{Nothing, T, 1}}
+	dualCache1::Vector{Dual{Nothing, T, 1}}
+	dualCache2::Vector{Dual{Nothing, T, 1}}
 	size::I
-	nprod::UInt16
+	nProd::UInt16
 end
 
 function HvpOperator(f, x::AbstractVector)
-	cache1 = Dual.(x, similar(x))
-	cache2 = Dual.(x, similar(x))
-	return HvpOperator(f, x, cache1, cache2, size(x, 1), UInt16(0))
+	dualCache1 = Dual.(x, similar(x))
+	dualCache2 = Dual.(x, similar(x))
+	return HvpOperator(f, x, dualCache1, dualCache2, size(x, 1), UInt16(0))
 end
 
 Base.eltype(op::HvpOperator{F, T, I}) where{F, T, I} = T
@@ -44,11 +44,11 @@ Base.size(op::HvpOperator) = (op.size, op.size)
 Base.:*(op::HvpOperator, v::AbstractVector) = _hvp(op.f, op.x, v)
 
 function LinearAlgebra.mul!(result::AbstractVector, op::HvpOperator, v::AbstractVector)
-	op.nprod += 1
+	op.nProd += 1
 
 	g = (∇, x) -> ∇ .= gradient(op.f, x)[1]
-	op.dual_cache1 .= Dual.(op.x, v)
-	result .= partials.(g(op.dual_cache2, op.dual_cache1), 1)
+	op.dualCache1 .= Dual.(op.x, v)
+	result .= partials.(g(op.dualCache2, op.dualCache1), 1)
 end
 
 #=

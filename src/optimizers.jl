@@ -18,12 +18,13 @@ Input:
     f :: scalar valued function
     grads :: gradient function (defaults to backward mode AD)
     hess :: hessian function (defaults to forward over back AD)
+    maxIter :: maximum iterations (optional)
 =#
 function minimize!(opt::CubicNewtonOptimizer, f, x;
                     grads=x -> gradient(f, x)[1], hess=x -> HvpOperator(f, x),
-                    itmax=1e3)
+                    maxIter=1e3)
     #iterate and update
-    for i in 1:itmax
+    for i in 1:maxIter
         step!(opt, f, x, grads(x), hess(x))
     end
 end
@@ -48,6 +49,7 @@ Input:
     x :: current iterate
     grads :: function gradients
     hess :: hessian operator
+    last :: current function value at x
 =#
 function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     #solve sub-problem to yield descent direction s
@@ -58,8 +60,8 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     #extract indices of shifts that resulted in a positive definite system
     i = findfirst(==(false), stats.indefinite)
 
-    num_shifts = size(opt.λ, 1)
-    while i <= num_shifts
+    numShifts = size(opt.λ, 1)
+    while i <= numShifts
         #update and evaluate
         x .+= d[i]
         ρ = (f(x) - last)/_quadratic_eval(d[i], grads, hess)
@@ -70,7 +72,7 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
 
             σ₀ = opt.σ
             while opt.σ > opt.γ₁*σ₀
-                i < num_shifts ? i+=1 : return false #try next shift
+                i < numShifts ? i+=1 : return false #try next shift
                 opt.σ = norm(d[i])/opt.λ[i] #decrease regularization parameter
             end
         #medium success, do nothing
