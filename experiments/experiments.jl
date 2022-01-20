@@ -21,8 +21,7 @@ Build and train
 =#
 
 #build model
-# model = build_dense(28*28, 10, 6e4, 1)
-model = mnist_dense()
+model = build_dense(28*28, 10, 6e4, 1)
 
 #load data
 train, test = mnist(batchSize)

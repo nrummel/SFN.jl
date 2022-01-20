@@ -4,7 +4,8 @@ Author: Cooper Simpson
 Functionality for building and using dense NNs.
 =#
 
-using Flux: flatten, Dense, softmax, onecold, logitcrossentropy, params
+using Flux: Chain, flatten, Dense, softmax, onecold, logitcrossentropy, params, relu
+using Roots: find_zero
 
 #=
 Build a simple dense NN with paramaters ≈ data points * over paramaterization factor.
@@ -15,17 +16,29 @@ Input:
     numData :: number of training data points
     opFactor :: over paramaterization factor
     numLayers :: depth of network (optional)
+    scale :: per-layer scale in parameters
 =#
-# function build_dense(inputDim, outputDim, numData, opFactor, numLayers=3)
-#     #calculate dimensions so that each layer has approximately equal parameters
-#     params = ceil(Int, numData*opFactor/numLayers)
-#
-#     return model
-# end
+function build_dense(inputDim, outputDim, numData, opFactor, numLayers=3, scale=0.5)
+    #calculate dimensions so that each layer has approximately equal parameters
+    totalParams = numData*opFactor
 
-function mnist_dense()
-    return Flux.Chain(flatten, Dense(28*28, 72, relu),
-                        Dense(72, 48, relu), Dense(48, 10))
+    l = numLayers-2
+    p(x, i, k) = x*scale^(i-1+k)
+    params(x) = begin
+        res = x*inputDim
+        for i=1:l
+            dᵢ, dₒ = p(x, i, 0), p(x, i, 1)
+            res += dₒ*(dᵢ + 1)
+        end
+        return res += outputDim*(p(x, l, 1) + 1)
+    end
+    x = ceil(Int, find_zero(x -> params(x)-totalParams, (0, totalParams/inputDim)))
+
+    model = Dense(inputDim, ceil(Int, p(x, 1, 0)), relu)
+    for i=1:l
+        model = Dense(ceil(Int, p(x, i, 0)), ceil(Int, p(x, i, 1)), relu)∘model
+    end
+    return Dense(ceil(Int, p(x, l, 1)), outputDim)∘model
 end
 
 #=

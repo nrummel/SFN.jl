@@ -1,8 +1,7 @@
 [deps]
 CubicNewton = "0c568c97-1dfb-438d-a4b2-d21d63173d9f"
-EAGO = "bb8be931-2a91-5aca-9f87-79e1cb69959a"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
-JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 MLDatasets = "eb30cadb-4394-5ae3-aed4-317e484a6458"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
