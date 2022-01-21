@@ -1,8 +1,9 @@
 # CubicNewton
 
 ## TODO
-- Update the hvp operator according to information from that GitHub question on SparseDiffTools.jl
-- Implement a new hvp operator using ReverseDiff.jl instead of Zygote.jl for the backward mode step
+- Implement a new hvp operator using ReverseDiff.jl (or something) instead of Zygote.jl for the backward mode step
+- Add appropriate tag instead of nothing for Dual in hvp operator
+- Add gradient config stuff to ForwardDiff Dual (and maybe reverse part)
 
 ## Testing
 To test CubicNewton as a package do the following in the REPL:

@@ -14,7 +14,9 @@ Input:
 	v :: vector
 =#
 function _hvp(f, x, v)
-	return partials.(gradient(f, Dual.(x, v))[1], 1)
+	val, back = pullback(f, Dual.(x,v))
+
+	return partials.(back(one.(val))[1], 1)
 end
 
 #=
@@ -28,15 +30,13 @@ mutable struct HvpOperator{F, T, I}
 	f::F
 	x::Vector{T}
 	dualCache1::Vector{Dual{Nothing, T, 1}}
-	dualCache2::Vector{Dual{Nothing, T, 1}}
 	size::I
 	nProd::UInt16
 end
 
 function HvpOperator(f, x::AbstractVector)
 	dualCache1 = Dual.(x, similar(x))
-	dualCache2 = Dual.(x, similar(x))
-	return HvpOperator(f, x, dualCache1, dualCache2, size(x, 1), UInt16(0))
+	return HvpOperator(f, x, dualCache1, size(x, 1), UInt16(0))
 end
 
 Base.eltype(op::HvpOperator{F, T, I}) where{F, T, I} = T
@@ -46,9 +46,10 @@ Base.:*(op::HvpOperator, v::AbstractVector) = _hvp(op.f, op.x, v)
 function LinearAlgebra.mul!(result::AbstractVector, op::HvpOperator, v::AbstractVector)
 	op.nProd += 1
 
-	g = (∇, x) -> ∇ .= gradient(op.f, x)[1]
 	op.dualCache1 .= Dual.(op.x, v)
-	result .= partials.(g(op.dualCache2, op.dualCache1), 1)
+	val, back = pullback(op.f, op.dualCache1)
+
+	result .= partials.(back(one.(val))[1], 1)
 end
 
 #=

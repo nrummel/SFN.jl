@@ -10,7 +10,7 @@ if run_all || "utilities" in ARGS
     @testset "utilities" begin
 
         #define the quadratic
-        n = rand(5:10)
+        n = 10
         A = randn((n,n))
         f(x) = x'*A*x
 
@@ -37,7 +37,7 @@ if run_all || "utilities" in ARGS
             @test eltype(Hop) == eltype(x)
             @test size(Hop) == (n, n)
             @test result ≈ expected
-            @test Hop.nprod == 1
+            @test Hop.nProd == 1
 
             #TODO: Test hessian matrix multiplication, can Dual even handle that?
         end

@@ -10,7 +10,7 @@ Setup
 =#
 using Requires
 using LinearAlgebra
-using Zygote: gradient, withgradient
+using Zygote: pullback
 using ForwardDiff: partials, Dual
 using Krylov: cg_lanczos
 

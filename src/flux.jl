@@ -45,6 +45,6 @@ function Flux.Optimise.train!(model, _, data, opt::StochasticCubicNewton)
         grads = back(one.(loss))
 
         #make an update step
-        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subSample), params), loss)
+        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subSample), params), sum(loss))
     end
 end

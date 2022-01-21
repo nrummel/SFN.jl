@@ -6,34 +6,30 @@ the Flux.jl package.
 =#
 
 using Flux
+using Zygote
 
 if run_all || "flux" in ARGS
     @testset "flux" begin
-        struct Quadratic{T<:AbstractArray}
-    		w::T
-    	end
-
-    	Flux.@functor Quadratic
-
-    	function (f::Quadratic)(x::AbstractArray)
-    		return f.w'*(x*x')*f.w
-    	end
-
-        n = rand(5:10)
-        data = randn(n) #TODO: convert to use batches
-        model = Quadratic(randn(n))
+        n = 4
+        data = randn(n)
+        dataBatch = hcat(data, data)
+        model = Dense(n, 1, σ)
 
         #=
         Test basic hessian vector product
         =#
         @testset "hvp" begin
-            v = randn(n)
+            v = randn(n+1)
 
             params, re = Flux.destructure(model)
             f(w, x) = re(w)(x)
-            Hv = CubicNewton._hvp(f, params, data)
+            f(w) = f(w, dataBatch)
 
-            @test Hv(v) ≈ 2*(data*data')*v
+            Hop = CubicNewton.HvpOperator(f, params)
+            result = similar(v)
+            LinearAlgebra.mul!(result, Hop, v)
+
+            @test result ≈ hessian(w -> sum(f(w, dataBatch)), params)*v
 
             #TODO: Add some more complicated hvp tests here
         end
