@@ -4,7 +4,6 @@ Author: Cooper Simpson
 Functionality for building and using dense NNs.
 =#
 
-using Flux: Chain, flatten, Dense, softmax, onecold, logitcrossentropy, params, relu
 using Roots: find_zero
 
 #=
@@ -34,11 +33,11 @@ function build_dense(inputDim, outputDim, numData, opFactor, numLayers=3, scale=
     end
     x = ceil(Int, find_zero(x -> params(x)-totalParams, (0, totalParams/inputDim)))
 
-    model = Dense(inputDim, ceil(Int, p(x, 1, 0)), relu)
+    model = Flux.Dense(inputDim, ceil(Int, p(x, 1, 0)), relu)∘Flux.flatten
     for i=1:l
-        model = Dense(ceil(Int, p(x, i, 0)), ceil(Int, p(x, i, 1)), relu)∘model
+        model = Flux.Dense(ceil(Int, p(x, i, 0)), ceil(Int, p(x, i, 1)), relu)∘model
     end
-    return Dense(ceil(Int, p(x, l, 1)), outputDim)∘model
+    return Flux.Dense(ceil(Int, p(x, l, 1)), outputDim)∘model
 end
 
 #=
@@ -48,7 +47,7 @@ Input:
     model :: NN model
     x :: input data
 =#
-predict(model, x) = softmax(model(x))
+predict(model, x) = Flux.softmax(model(x))
 
 #=
 Compute model accuracy on given data.
@@ -61,7 +60,7 @@ Input:
 function accuracy(model, dataLoader, labels)
     correct, total = 0, 0
     for (x, y) in dataLoader
-        pred = onecold(predict(model, x), labels)
+        pred = Flux.onecold(predict(model, x), labels)
 
         total += size(labels, 1)
         correct += sum(pred .== y)

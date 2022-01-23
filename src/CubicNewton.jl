@@ -12,9 +12,9 @@ using Requires
 using LinearAlgebra
 using Zygote: pullback
 using ForwardDiff: partials, Dual
-using Krylov: cg_lanczos
+using Krylov: CgLanczosShiftSolver, cg_lanczos!
 
-export ShiftedLanczosCG, Eigen, minimize!
+export ShiftedLanczosCG, minimize!
 
 include("utilities.jl")
 include("optimizers.jl")

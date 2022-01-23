@@ -21,22 +21,18 @@ end
 
 #=
 In-place hvp operator compatible with Krylov.jl
-
-NOTE: Should maybe also add in some gradient config details as seen in ForwardDiff's
-documentation.
-NOTE: Krylov.jl will throw an error if T is not Float64
 =#
 mutable struct HvpOperator{F, T, I}
 	f::F
-	x::Vector{T}
+	x::AbstractArray{T, 1}
 	dualCache1::Vector{Dual{Nothing, T, 1}}
 	size::I
-	nProd::UInt16
+	nProd::I
 end
 
 function HvpOperator(f, x::AbstractVector)
 	dualCache1 = Dual.(x, similar(x))
-	return HvpOperator(f, x, dualCache1, size(x, 1), UInt16(0))
+	return HvpOperator(f, x, dualCache1, size(x, 1), 0)
 end
 
 Base.eltype(op::HvpOperator{F, T, I}) where{F, T, I} = T

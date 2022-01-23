@@ -9,42 +9,36 @@ using .Flux
 #=
 Optimizer for stochastic cubic Newton type methods.
 =#
-mutable struct StochasticCubicNewton
-    optimizer::CubicNewtonOptimizer
-    hessianSampleSize::UInt16
+Base.@kwdef mutable struct StochasticCubicNewton
+    optimizer::CubicNewtonOptimizer = ShiftedLanczosCG()
+    hessianSampleFactor = 0.1
 end
 
 #=
 Custom Flux training function for a StochasticCubicNewton optimizer
 
 Input:
-    model :: model + loss function
-    _ :: model parameters (see below)
-    data :: training data
+    f :: model + loss function
+    ps :: model params
+    trainLoader :: training data
     opt :: cubic newton optimizer
-
-Because we extract the parameters from the model via a call to destructure, we
-assume that all parameters there are being updated, and we don't need the
-parameters passed in this function call.
 =#
-function Flux.Optimise.train!(model, _, data, opt::StochasticCubicNewton)
-    #construct function compatible with optimizer
-    params, re = Flux.destructure(model)
-    f(θ, z) = re(θ)(z...)
+function Flux.Optimise.train!(f, ps, trainLoader, opt::StochasticCubicNewton)
+    for (X, Y) in trainLoader
+        #build hvp operator using subsampled batch
+        n = size(X, ndims(X))
 
-    for batch in data
-        #function of the parameters only
-        f(θ) = θ -> f(θ, batch)
+        indices = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
+        subSampleX = selectdim(X, ndims(X), indices)
+        subSampleY = selectdim(Y, ndims(Y), indices)
 
-        #extract sub-sampled batch for hvp
-        n = size(data, 1)
-        subSample = selectdim(data, 1, rand(1:n, opt.hessianSampleSize))
+        Hop = HvpOperator(θ -> f(θ, subSampleX, subSampleY), ps)
 
         #compute gradients
-        loss, back = pullback(f, params)
-        grads = back(one.(loss))
+        loss, back = pullback(θ -> f(θ, X, Y), ps)
+        grads = back(one(loss))[1]
 
         #make an update step
-        opt.optimizer(f, params, grads, HVPOperator(θ -> f(θ, subSample), params), sum(loss))
+        step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
     end
 end

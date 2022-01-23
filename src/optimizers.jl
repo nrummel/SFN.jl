@@ -38,7 +38,7 @@ Base.@kwdef mutable struct ShiftedLanczosCG<:CubicNewtonOptimizer
     η₂::Float32 = 0.75 #very successful update threshold
     γ₁::Float32 = 0.1 #regularization decrease factor
     γ₂::Float32 = 5.0 #regularization increase factor
-    λ::Vector{Float64} = [10.0^x for x in -15:1:15] #shifts
+    λ::Vector{Float32} = [10.0^x for x in -15:1:15] #shifts
 end
 
 #=
@@ -52,13 +52,16 @@ Input:
     last :: current function value at x
 =#
 function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
-    #solve sub-problem to yield descent direction s
-    #NOTE: I should maybe be passing check_curvature=true, also good idea to
-    #look at other optional arguments.
-    (d, stats) = cg_lanczos(hess, -grads, opt.λ)
+    #solve sub-problem to yield descent direction d
+    n = size(grads, 1)
+    solver = CgLanczosShiftSolver(n, n, size(opt.λ, 1), Vector{Float32})
+    cg_lanczos!(solver, hess, -grads, opt.λ, check_curvature=true)
 
     #extract indices of shifts that resulted in a positive definite system
-    i = findfirst(==(false), stats.indefinite)
+    i = findfirst(==(false), solver.stats.indefinite)
+
+    #extract solutions
+    d = solver.x
 
     numShifts = size(opt.λ, 1)
     while i <= numShifts

@@ -22,14 +22,13 @@ if run_all || "flux" in ARGS
             v = randn(n+1)
 
             params, re = Flux.destructure(model)
-            f(w, x) = re(w)(x)
-            f(w) = f(w, dataBatch)
+            f(w) = re(w)(dataBatch)
 
             Hop = CubicNewton.HvpOperator(f, params)
             result = similar(v)
             LinearAlgebra.mul!(result, Hop, v)
 
-            @test result ≈ hessian(w -> sum(f(w, dataBatch)), params)*v
+            @test result ≈ Flux.hessian(w -> sum(f(w, dataBatch)), params)*v
 
             #TODO: Add some more complicated hvp tests here
         end
@@ -38,7 +37,9 @@ if run_all || "flux" in ARGS
         Test optimizer interface, just making sure everything runs
         =#
         @testset "optimizer" begin
-            #TODO: Update this
+            # model = Flux.Dense(5,5)∘Flux.Dense(5,5)
+            # ps, re = Flux.destructure(model)
+            # loss(θ, x, y) = Flux.Losses.logitcrossentropy
         end
     end
 end
