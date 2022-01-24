@@ -62,9 +62,9 @@ function accuracy(model, dataLoader, labels)
     for (x, y) in dataLoader
         pred = Flux.onecold(predict(model, x), labels)
 
-        total += size(labels, 1)
+        total += size(y, 1)
         correct += sum(pred .== y)
     end
 
-    return correct/total
+    return (correct/total)*100
 end

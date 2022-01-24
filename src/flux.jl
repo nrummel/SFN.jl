@@ -42,3 +42,34 @@ function Flux.Optimise.train!(f, ps, trainLoader, opt::StochasticCubicNewton)
         step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
     end
 end
+
+#=
+Flatten a models parameters into a single vector, and then create a new model
+that references these flattened parameters.
+
+NOTE: Assumes everything is trainable
+
+Input:
+    model :: Flux model
+=#
+function make_flat(model)
+    #grab all the paramaters
+    ps = AbstractVector[]
+    fmap(model) do p
+        p isa AbstractArray && push!(arrays, vec(p))
+        return x
+    end
+    flat_ps = reduce(vcat, ps)
+
+    #Make a new model with views into flattened parameters
+    offset = Ref(0)
+    out = fmap(model) do p
+        p isa AbstractArray || return p
+        y = view(flat_ps, offset[] .+ (1:length(p)))
+        offset[] += length(p)
+        return reshape(y, size(p))
+    end
+
+    #return flattened parameters and new model
+    return flat, out
+end
