@@ -52,9 +52,14 @@ Input:
     last :: current function value at x
 =#
 function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
+    #NOTE: deal with this later, needed so that we can do evaluation of quadratic
+    #inplace
+    res = similar(grads)
+
     #solve sub-problem to yield descent direction d
+    #NOTE: initialize the CG stuff only once somewhere
     n = size(grads, 1)
-    solver = CgLanczosShiftSolver(n, n, size(opt.λ, 1), Vector{Float32})
+    solver = CgLanczosShiftSolver(n, n, size(opt.λ, 1), typeof(grads))
     cg_lanczos!(solver, hess, -grads, opt.λ, check_curvature=true)
 
     #extract indices of shifts that resulted in a positive definite system
@@ -67,7 +72,7 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     while i <= numShifts
         #update and evaluate
         x .+= d[i]
-        ρ = (f(x) - last)/_quadratic_eval(d[i], grads, hess)
+        ρ = (f(x) - last)/_quadratic_eval(d[i], grads, hess, res)
 
         #unsuccessful, so consider other shifts
         if ρ<opt.η₁
@@ -78,10 +83,12 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
                 i < numShifts ? i+=1 : return false #try next shift
                 opt.σ = norm(d[i])/opt.λ[i] #decrease regularization parameter
             end
-        #medium success, do nothing
         #very successful
         elseif ρ>opt.η₂
             opt.σ *= opt.γ₂ #increase regularization parameter
+            break
+        #medium success, do nothing
+        else
             break
         end
     end

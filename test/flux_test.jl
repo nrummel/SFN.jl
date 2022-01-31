@@ -13,7 +13,7 @@ if run_all || "flux" in ARGS
         n = 4
         data = randn(n)
         dataBatch = hcat(data, data)
-        model = Dense(n, 1, σ)
+        model = sum(Dense(n, 1, σ))
 
         #=
         Test basic hessian vector product
@@ -28,9 +28,10 @@ if run_all || "flux" in ARGS
             result = similar(v)
             LinearAlgebra.mul!(result, Hop, v)
 
-            @test result ≈ Flux.hessian(w -> sum(f(w, dataBatch)), params)*v
+            @test result ≈ Flux.hessian(w -> sum(f(w)), params)*v
 
             #TODO: Add some more complicated hvp tests here
+            #TODO: Add gpu tests
         end
 
         #=

@@ -15,8 +15,7 @@ Input:
 =#
 function _hvp(f, x, v)
 	val, back = pullback(f, Dual.(x,v))
-
-	return partials.(back(one.(val))[1], 1)
+	return partials.(back(one(val))[1], 1)
 end
 
 #=
@@ -25,7 +24,7 @@ In-place hvp operator compatible with Krylov.jl
 mutable struct HvpOperator{F, T, I}
 	f::F
 	x::AbstractArray{T, 1}
-	dualCache1::Vector{Dual{Nothing, T, 1}}
+	dualCache1::AbstractArray{Dual{Nothing, T, 1}}
 	size::I
 	nProd::I
 end
@@ -45,7 +44,7 @@ function LinearAlgebra.mul!(result::AbstractVector, op::HvpOperator, v::Abstract
 	op.dualCache1 .= Dual.(op.x, v)
 	val, back = pullback(op.f, op.dualCache1)
 
-	result .= partials.(back(one.(val))[1], 1)
+	result .= partials.(back(one(val))[1], 1)
 end
 
 #=
@@ -56,8 +55,10 @@ Input:
 	grads :: gradients
 	hess :: hessian operator
 =#
-function _quadratic_eval(d, grads, hess)
-	return dot(d, grads) + 0.5*dot(d, hess*d)
+function _quadratic_eval(d, grads, hess, res)
+	LinearAlgebra.mul!(res, hess, d)
+	res .+= grads
+	return dot(d, 0.5.*res)
 end
 
 #=

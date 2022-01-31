@@ -11,19 +11,25 @@ using CubicNewton: StochasticCubicNewton
 include("models.jl")
 include("datasets.jl")
 
+if Flux.use_cuda[] == false
+    ErrorException("Not using GPU.")
+end
+
+CUDA.allowscalar(false)
+
 #=
 Setup hyperparameters
 =#
 batchSize = 32
 epochs = 1
-order = 1
+order = 2
 
 #=
 Build and train
 =#
 
 #build model
-model = build_dense(28*28, 10, 1e4, 1) |> gpu
+model = build_dense(28*28, 10, 1e3, 1) |> gpu
 
 #load data
 trainLoader, testLoader = mnist(batchSize)
@@ -32,11 +38,12 @@ trainLoader, testLoader = mnist(batchSize)
 if order == 1
     opt = Flux.Descent()
     ps = params(model)
-    loss(x,y) = Flux.Losses.logitcrossentropy(model(x), y)
+    loss(x,y) = _logitcrossentropy(model(x), y)
 elseif order == 2
     opt = StochasticCubicNewton()
     ps, re = Flux.destructure(model)
-    loss(θ,x,y) = Flux.Losses.logitcrossentropy(re(θ)(x), y)
+    loss(θ,x,y) = _logitcrossentropy(re(θ)(x), y)
+    # loss(θ, x, y) = sum((re(θ)(x) .- y).^2)
 end
 
 #check accuracy before hand

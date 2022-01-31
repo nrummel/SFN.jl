@@ -26,20 +26,25 @@ Input:
 function Flux.Optimise.train!(f, ps, trainLoader, opt::StochasticCubicNewton)
     for (X, Y) in trainLoader
         #build hvp operator using subsampled batch
-        n = size(X, ndims(X))
+        # n = size(X, ndims(X))
+        #
+        # indices = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
+        # subX = selectdim(X, ndims(X), indices)
+        # #NOTE: Ideally selectdim would handle this properly, so we wouldn't
+        # #have to convert indices into cuda array
+        # subY = Base.unsafe_view(Y, Base.Slice(Base.OneTo(size(Y,1))), subX.indices[ndims(X)])
+        subX, subY = X, Y
 
-        indices = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
-        subSampleX = selectdim(X, ndims(X), indices)
-        subSampleY = selectdim(Y, ndims(Y), indices)
-
-        Hop = HvpOperator(θ -> f(θ, subSampleX, subSampleY), ps)
+        Hop = HvpOperator(θ -> f(θ, subX, subY), ps)
 
         #compute gradients
         loss, back = pullback(θ -> f(θ, X, Y), ps)
         grads = back(one(loss))[1]
 
         #make an update step
+        print("...")
         step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
+        println("step")
     end
 end
 

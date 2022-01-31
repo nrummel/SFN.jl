@@ -5,6 +5,14 @@ Functionality for building and using dense NNs.
 =#
 
 using Roots: find_zero
+using Statistics: mean
+
+#=
+Custom activations and losses to get around problems with ForwardDiff and cuDNN
+=#
+_relu(x) = max.(0,x)
+_logsoftmax(x) = x .- log.(sum(exp.(x)))
+_logitcrossentropy(ŷ, y) = mean(.-sum(y.*_logsoftmax(ŷ)))
 
 #=
 Build a simple dense NN with paramaters ≈ data points * over paramaterization factor.
@@ -33,9 +41,9 @@ function build_dense(inputDim, outputDim, numData, opFactor, numLayers=3, scale=
     end
     x = ceil(Int, find_zero(x -> params(x)-totalParams, (0, totalParams/inputDim)))
 
-    model = Flux.Dense(inputDim, ceil(Int, p(x, 1, 0)), relu)∘Flux.flatten
+    model = Flux.Dense(inputDim, ceil(Int, p(x, 1, 0)), _relu)∘Flux.flatten
     for i=1:l
-        model = Flux.Dense(ceil(Int, p(x, i, 0)), ceil(Int, p(x, i, 1)), relu)∘model
+        model = Flux.Dense(ceil(Int, p(x, i, 0)), ceil(Int, p(x, i, 1)), _relu)∘model
     end
     return Flux.Dense(ceil(Int, p(x, l, 1)), outputDim)∘model
 end
