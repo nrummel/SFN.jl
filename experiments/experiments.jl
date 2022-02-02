@@ -20,7 +20,7 @@ CUDA.allowscalar(false)
 #=
 Setup hyperparameters
 =#
-batchSize = 32
+batchSize = 128
 epochs = 1
 order = 2
 
@@ -29,7 +29,7 @@ Build and train
 =#
 
 #build model
-model = build_dense(28*28, 10, 1e3, 1) |> gpu
+model = build_dense(28*28, 10, 6e4, 1) |> gpu
 
 #load data
 trainLoader, testLoader = mnist(batchSize)

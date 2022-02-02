@@ -11,25 +11,6 @@ Parent type for cubic Newton optimizers.
 abstract type CubicNewtonOptimizer end
 
 #=
-Minimize the given function according to the subtype update rule.
-
-Input:
-    opt :: CubicNewtonOptimizer subtype
-    f :: scalar valued function
-    grads :: gradient function (defaults to backward mode AD)
-    hess :: hessian function (defaults to forward over back AD)
-    maxIter :: maximum iterations (optional)
-=#
-function minimize!(opt::CubicNewtonOptimizer, f, x;
-                    grads=x -> gradient(f, x)[1], hess=x -> HvpOperator(f, x),
-                    maxIter=1e3)
-    #iterate and update
-    for i in 1:maxIter
-        step!(opt, f, x, grads(x), hess(x))
-    end
-end
-
-#=
 Cubic Newton optimizer using shifted Lanczos-CG for solving the sub-problem.
 =#
 Base.@kwdef mutable struct ShiftedLanczosCG<:CubicNewtonOptimizer
@@ -57,8 +38,8 @@ Input:
     hess :: hessian operator
     last :: current function value at x
 =#
-function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
-    #NOTE: deal with this later, needed so that we can do evaluation of quadratic
+function step!(opt::ShiftedLanczosCG, f::Function, x::T, grads::T, hess::HvpOperator, last::Float32) where T<:AbstractVector
+    #TODO: deal with this later, needed so that we can do evaluation of quadratic
     #inplace
     res = similar(grads)
 
@@ -72,7 +53,7 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     d = opt.solver.x
 
     numShifts = size(opt.λ, 1)
-    while i <= numShifts
+    @inbounds while i <= numShifts
         #update and evaluate
         x .+= d[i]
         ρ = (f(x) - last)/_quadratic_eval(d[i], grads, hess, res)

@@ -23,7 +23,7 @@ Input:
     hessianSampleFactor :: hessian sub sample factor in (0,1] (optional)
 =#
 function StochasticCubicNewton(type::Type, dim::Int, hessianSampleFactor=0.1)
-    if !((0 < hessianSampleFactor) && (hessianSampleFactor <= 1))
+    if !((0.0 < hessianSampleFactor) && (hessianSampleFactor <= 1.0))
         throw(ArgumentError("Hessian sample factor not in range (0,1]."))
     end
 
@@ -39,7 +39,7 @@ Input:
     trainLoader :: training data
     opt :: cubic newton optimizer
 =#
-function Flux.Optimise.train!(f, ps, trainLoader, opt::StochasticCubicNewton)
+function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCubicNewton) where T<:AbstractVector
     for (X, Y) in trainLoader
         #build hvp operator using subsampled batch
         n = size(X, ndims(X))

@@ -49,7 +49,7 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function HvpOperator(f, x)
+function HvpOperator(f::Function, x::T) where T<:AbstractVector
 	dualCache1 = Dual.(x, similar(x))
 	return HvpOperator(f, x, dualCache1, size(x, 1), 0)
 end
@@ -83,7 +83,7 @@ Input:
 	op :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::AbstractVector, op::HvpOperator, v::AbstractVector)
+function LinearAlgebra.mul!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
 	op.nProd += 1
 
 	op.dualCache1 .= Dual.(op.x, v)
@@ -100,7 +100,7 @@ Input:
 	grads :: gradients
 	hess :: hessian operator
 =#
-function _quadratic_eval(d, grads, hess, res)
+function _quadratic_eval(d::T, grads::T, hess::HvpOperator, res::T) where T<:AbstractVector
 	LinearAlgebra.mul!(res, hess, d)
 	res .+= grads
 	return dot(d, 0.5.*res)
