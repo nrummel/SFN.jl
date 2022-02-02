@@ -36,14 +36,13 @@ trainLoader, testLoader = mnist(batchSize)
 
 #select optimizer and add loss function
 if order == 1
-    opt = Flux.Descent()
     ps = params(model)
     loss(x,y) = _logitcrossentropy(model(x), y)
+    opt = Flux.Descent()
 elseif order == 2
-    opt = StochasticCubicNewton()
     ps, re = Flux.destructure(model)
     loss(θ,x,y) = _logitcrossentropy(re(θ)(x), y)
-    # loss(θ, x, y) = sum((re(θ)(x) .- y).^2)
+    opt = StochasticCubicNewton(typeof(ps), size(ps, 1))
 end
 
 #check accuracy before hand

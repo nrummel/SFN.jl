@@ -3,10 +3,13 @@ using ForwardDiff: partials, Dual
 using Zygote: pullback
 using CUDA
 using LinearAlgebra
+using Statistics: mean
 
 if Flux.use_cuda[] == false
     ErrorException("Not using GPU.")
 end
+
+CUDA.allowscalar(false)
 
 #=
 In-place hvp operator compatible with Krylov.jl
@@ -41,10 +44,17 @@ _logsoftmax(x) = x .- log.(sum(exp.(x)))
 _logitcrossentropy(ŷ, y) = mean(.-sum(y.*_logsoftmax(ŷ)))
 
 data = randn(10, 4) |> gpu
-model = sum∘Dense(10, 10)∘_relu∘Dense(10,10) |> gpu
+labels = Flux.onehotbatch(rand(1:10, 4), 1:10) |> gpu
+
+data = data[Tuple(Colon() for i in 1:ndims(data)-1)..., [1,3]]
+labels = labels[:, [1,3]]
+
+exit()
+
+model = Dense(10, 10)∘_relu∘Dense(10,10) |> gpu
 
 ps, re = Flux.destructure(model)
-f(θ) = re(θ)(data)
+f(θ) = _logitcrossentropy(re(θ)(data), labels)
 
 Hop = HvpOperator(f, ps)
 

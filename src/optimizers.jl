@@ -33,12 +33,18 @@ end
 Cubic Newton optimizer using shifted Lanczos-CG for solving the sub-problem.
 =#
 Base.@kwdef mutable struct ShiftedLanczosCG<:CubicNewtonOptimizer
+    solver::CgLanczosShiftSolver
+    λ::Vector{Float32} #shifts
     σ::Float32 = 1.0 #regularization parameter
     η₁::Float32 = 0.1 #unsuccessful update threshold
     η₂::Float32 = 0.75 #very successful update threshold
     γ₁::Float32 = 0.1 #regularization decrease factor
     γ₂::Float32 = 5.0 #regularization increase factor
-    λ::Vector{Float32} = [10.0^x for x in -15:1:15] #shifts
+end
+
+function ShiftedLanczosCG(type::Type, dim::Int, shifts=[10.0^x for x in -15:1:15])
+    solver = CgLanczosShiftSolver(dim, dim, size(shifts, 1), type)
+    return ShiftedLanczosCG(solver=solver, λ=shifts)
 end
 
 #=
@@ -57,16 +63,13 @@ function step!(opt::ShiftedLanczosCG, f, x, grads, hess, last=f(x))
     res = similar(grads)
 
     #solve sub-problem to yield descent direction d
-    #NOTE: initialize the CG stuff only once somewhere
-    n = size(grads, 1)
-    solver = CgLanczosShiftSolver(n, n, size(opt.λ, 1), typeof(grads))
-    cg_lanczos!(solver, hess, -grads, opt.λ, check_curvature=true)
+    cg_lanczos!(opt.solver, hess, -grads, opt.λ, check_curvature=true)
 
     #extract indices of shifts that resulted in a positive definite system
-    i = findfirst(==(false), solver.stats.indefinite)
+    i = findfirst(==(false), opt.solver.stats.indefinite)
 
     #extract solutions
-    d = solver.x
+    d = opt.solver.x
 
     numShifts = size(opt.λ, 1)
     while i <= numShifts

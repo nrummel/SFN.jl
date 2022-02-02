@@ -10,8 +10,24 @@ using .Flux
 Optimizer for stochastic cubic Newton type methods.
 =#
 Base.@kwdef mutable struct StochasticCubicNewton
-    optimizer::CubicNewtonOptimizer = ShiftedLanczosCG()
-    hessianSampleFactor = 0.1
+    optimizer::CubicNewtonOptimizer
+    hessianSampleFactor::Float32
+end
+
+#=
+Constructor.
+
+Input:
+    type :: type of paramaters, gradients, etc.
+    dim :: number of parameters (length of gradient)
+    hessianSampleFactor :: hessian sub sample factor in (0,1] (optional)
+=#
+function StochasticCubicNewton(type::Type, dim::Int, hessianSampleFactor=0.1)
+    if !((0 < hessianSampleFactor) && (hessianSampleFactor <= 1))
+        throw(ArgumentError("Hessian sample factor not in range (0,1]."))
+    end
+
+    return StochasticCubicNewton(optimizer=ShiftedLanczosCG(type, dim), hessianSampleFactor=hessianSampleFactor)
 end
 
 #=
@@ -26,15 +42,15 @@ Input:
 function Flux.Optimise.train!(f, ps, trainLoader, opt::StochasticCubicNewton)
     for (X, Y) in trainLoader
         #build hvp operator using subsampled batch
-        # n = size(X, ndims(X))
-        #
-        # indices = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
-        # subX = selectdim(X, ndims(X), indices)
-        # #NOTE: Ideally selectdim would handle this properly, so we wouldn't
-        # #have to convert indices into cuda array
-        # subY = Base.unsafe_view(Y, Base.Slice(Base.OneTo(size(Y,1))), subX.indices[ndims(X)])
-        subX, subY = X, Y
+        n = size(X, ndims(X))
 
+        idx = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
+        # subX = selectdim(X, ndims(X), idx)
+        # subY = Base.unsafe_view(Y, Base.Slice(Base.OneTo(size(Y,1))), subX.indices[ndims(X)])
+        subX = X[Tuple([Colon() for i in 1:ndims(X)-1])..., idx]
+        subY = Y[:, idx]
+
+        # update!(opt.Hop, θ -> f(θ, subX, subY), ps)
         Hop = HvpOperator(θ -> f(θ, subX, subY), ps)
 
         #compute gradients
