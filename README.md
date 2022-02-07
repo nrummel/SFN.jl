@@ -7,7 +7,11 @@
 - Should we be passing check_curvature to the cg_lanczos call?
 - Only construct hvp operator once and then update it in loops
 - Is it possible to only update the partials value of Dual? It seems unlikely since it is immutable
-- Stop using unsafe_view in train! when NNlibCUDA issue is fixed
+- Switch back to Flux functions for relu, softmax, and logitcrossentropy when NNlibCUDA issue is fixed
+- Look into how effective the DataLoaders stuff is, it seems to be wasting a lot of effeciency
+- Get the getobs! function working for DataLoaders
+- Figure out what the issue with propagating views of CUDA arrays is (i.e. subsampling for hvp)
+- Figure out what the issue with sparse CUDA arrays/vectors is
 
 ## Testing
 To test CubicNewton as a package do the following in the REPL:

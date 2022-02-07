@@ -18,6 +18,7 @@ export ShiftedLanczosCG, minimize!
 
 include("utilities.jl")
 include("optimizers.jl")
+include("logger.jl")
 
 #=
 If Flux is loaded then export compatability functions.

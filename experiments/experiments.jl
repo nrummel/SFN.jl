@@ -7,6 +7,7 @@ Main experiment logic.
 using Flux
 using CUDA
 using CubicNewton: StochasticCubicNewton
+using Serialization
 
 include("models.jl")
 include("datasets.jl")
@@ -20,9 +21,9 @@ CUDA.allowscalar(false)
 #=
 Setup hyperparameters
 =#
-batchSize = 128
+batchSize = 256
 epochs = 1
-order = 2
+order = 1
 
 #=
 Build and train
@@ -37,7 +38,7 @@ trainLoader, testLoader = mnist(batchSize)
 #select optimizer and add loss function
 if order == 1
     ps = params(model)
-    loss(x,y) = _logitcrossentropy(model(x), y)
+    loss(x,y) = Flux.Losses.logitcrossentropy(model(x), y)
     opt = Flux.Descent()
 elseif order == 2
     ps, re = Flux.destructure(model)
@@ -45,18 +46,31 @@ elseif order == 2
     opt = StochasticCubicNewton(typeof(ps), size(ps, 1))
 end
 
+#check GPU usage
+println(CUDA.memory_status())
+
 #check accuracy before hand
-println("Accuracy: $(accuracy(model, testLoader, 0:9))")
+# println("Accuracy: $(accuracy(model, testLoader, 0:9))")
+acc = Vector{Float32}(undef, epochs)
 
 #train
 for epoch = 1:epochs
     println("Epoch: $epoch")
     Flux.Optimise.train!(loss, ps, trainLoader, opt)
+
+    #Need to do this because ps is a copy of the parameters
+    if order == 2
+        acc[epoch] = accuracy(re(ps), testLoader, 0:9)
+    else
+        acc[epoch] = accuracy(model, testLoader, 0:9)
+    end
 end
 
-#Need to do this because ps is a copy of the parameters
-if order == 2
-    model = re(ps)
-end
+println("Final Accuracy: $(acc[epochs])")
 
-println("Accuracy: $(accuracy(model, testLoader, 0:9))")
+# #Serialize logger
+# if order == 2
+#     serialize("results/order-$order", (acc, opt.log.hvps))
+# else
+#     serialize("results/order-$order", (acc,))
+# end

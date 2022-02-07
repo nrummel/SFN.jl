@@ -7,6 +7,6 @@ Utilities for working with the cubic newton optimizer.
 #=
 Tracks information
 =#
-mutable struct Logger
-    hvp_calls::Real
+Base.@kwdef mutable struct Logger
+    hvps::Int64 = 0
 end

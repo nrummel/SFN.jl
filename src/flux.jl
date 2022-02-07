@@ -12,6 +12,7 @@ Optimizer for stochastic cubic Newton type methods.
 Base.@kwdef mutable struct StochasticCubicNewton
     optimizer::CubicNewtonOptimizer
     hessianSampleFactor::Float32
+    log = Logger()
 end
 
 #=
@@ -46,7 +47,7 @@ function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCu
 
         idx = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
         # subX = selectdim(X, ndims(X), idx)
-        # subY = Base.unsafe_view(Y, Base.Slice(Base.OneTo(size(Y,1))), subX.indices[ndims(X)])
+        # subY = selectdim(Y, ndims(Y), idx)
         subX = X[Tuple([Colon() for i in 1:ndims(X)-1])..., idx]
         subY = Y[:, idx]
 
@@ -58,9 +59,9 @@ function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCu
         grads = back(one(loss))[1]
 
         #make an update step
-        print("...")
         step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
-        println("step")
+
+        opt.log.hvps += Hop.nProd
     end
 end
 
