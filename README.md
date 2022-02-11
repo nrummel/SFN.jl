@@ -10,8 +10,7 @@
 - Switch back to Flux functions for relu, softmax, and logitcrossentropy when NNlibCUDA issue is fixed
 - Look into how effective the DataLoaders stuff is, it seems to be wasting a lot of effeciency
 - Get the getobs! function working for DataLoaders
-- Figure out what the issue with propagating views of CUDA arrays is (i.e. subsampling for hvp)
-- Figure out what the issue with sparse CUDA arrays/vectors is
+- It would be nice if views worked properly, and if one hot arrays could be represented by sparse arrays, but it seems this functionality doesn't exist
 
 ## Testing
 To test CubicNewton as a package do the following in the REPL:

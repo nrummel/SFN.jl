@@ -5,6 +5,9 @@ Associated functionality for solving the cubic sub-problem in
 cubic newton type methods.
 =#
 
+using Zygote: pullback
+using ForwardDiff: partials, Dual
+
 #=
 Fast hessian vector product (hvp) function using forward-over-back AD
 

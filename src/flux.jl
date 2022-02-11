@@ -5,6 +5,7 @@ All functionality to interact with Flux.jl and support optimizing models using
 newton type methods.
 =#
 using .Flux
+using Zygote: pullback
 
 #=
 Optimizer for stochastic cubic Newton type methods.
@@ -41,13 +42,24 @@ Input:
     opt :: cubic newton optimizer
 =#
 function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCubicNewton) where T<:AbstractVector
-    for (X, Y) in trainLoader
+    grads = similar(ps)
+
+    #TODO: allocate spsace for subsamples only once
+    # sampleSize = opt.hessianSampleFactor*n
+    # subX = 
+    # subY =
+
+    @inbounds for (X, Y) in trainLoader
         #build hvp operator using subsampled batch
         n = size(X, ndims(X))
 
         idx = rand(1:n, ceil(Int, opt.hessianSampleFactor*n))
+
+        #inplace view
         # subX = selectdim(X, ndims(X), idx)
         # subY = selectdim(Y, ndims(Y), idx)
+
+        #copy
         subX = X[Tuple([Colon() for i in 1:ndims(X)-1])..., idx]
         subY = Y[:, idx]
 
@@ -56,10 +68,10 @@ function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCu
 
         #compute gradients
         loss, back = pullback(θ -> f(θ, X, Y), ps)
-        grads = back(one(loss))[1]
+        grads .= back(one(loss))[1]
 
         #make an update step
-        step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
+        @time step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
 
         opt.log.hvps += Hop.nProd
     end

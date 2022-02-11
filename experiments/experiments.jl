@@ -1,3 +1,4 @@
+
 #=
 Author: Cooper Simpson
 
@@ -6,12 +7,12 @@ Main experiment logic.
 
 using Flux
 using CUDA
-using CubicNewton: StochasticCubicNewton
 using Serialization
+import CubicNewton as CN
 
-include("models.jl")
-include("datasets.jl")
-
+#=
+Check on GPU
+=#
 if Flux.use_cuda[] == false
     ErrorException("Not using GPU.")
 end
@@ -19,21 +20,21 @@ end
 CUDA.allowscalar(false)
 
 #=
-Setup hyperparameters
+Setup test
 =#
 batchSize = 256
 epochs = 1
-order = 1
+order = 2
 
 #=
 Build and train
 =#
 
 #build model
-model = build_dense(28*28, 10, 6e4, 1) |> gpu
+model = CN.build_dense(28*28, 10, 6e4, 1) |> gpu
 
 #load data
-trainLoader, testLoader = mnist(batchSize)
+trainLoader, testLoader = CN.mnist(batchSize, "./data/MNIST")
 
 #select optimizer and add loss function
 if order == 1
@@ -42,15 +43,15 @@ if order == 1
     opt = Flux.Descent()
 elseif order == 2
     ps, re = Flux.destructure(model)
-    loss(θ,x,y) = _logitcrossentropy(re(θ)(x), y)
-    opt = StochasticCubicNewton(typeof(ps), size(ps, 1))
+    loss(θ,x,y) = CN._logitcrossentropy(re(θ)(x), y)
+    opt = CN.StochasticCubicNewton(typeof(ps), size(ps, 1))
 end
 
 #check GPU usage
-println(CUDA.memory_status())
+#TODO: Log this information somewhere instead
+println(CUDA.memory_status(), "\n")
 
-#check accuracy before hand
-# println("Accuracy: $(accuracy(model, testLoader, 0:9))")
+#testing accuracy
 acc = Vector{Float32}(undef, epochs)
 
 #train
@@ -60,13 +61,13 @@ for epoch = 1:epochs
 
     #Need to do this because ps is a copy of the parameters
     if order == 2
-        acc[epoch] = accuracy(re(ps), testLoader, 0:9)
+        acc[epoch] = CN.accuracy(re(ps), testLoader, 0:9)
     else
-        acc[epoch] = accuracy(model, testLoader, 0:9)
+        acc[epoch] = CN.accuracy(model, testLoader, 0:9)
     end
 end
 
-println("Final Accuracy: $(acc[epochs])")
+println("Training completed, saving data...")
 
 # #Serialize logger
 # if order == 2

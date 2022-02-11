@@ -1,4 +1,4 @@
-relu#=
+#=
 Author: Cooper Simpson
 
 Functionality for building and using dense NNs.
@@ -67,7 +67,7 @@ Input:
 =#
 function accuracy(model, dataLoader, labels)
     correct, total = 0, 0
-    for (x, y) in CuIterator(dataLoader)
+    for (x, y) in dataLoader
         pred = Flux.onecold(predict(model, x), labels)
 
         total += size(y, 1)

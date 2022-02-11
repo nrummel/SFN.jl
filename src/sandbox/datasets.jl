@@ -4,16 +4,14 @@ Author: Cooper Simpson
 Functionality for working with datasets.
 =#
 
+using .Flux
 using DataLoaders
-using SparseArrays: sparsevec, sparse
 using MLDatasets: MNIST
 
 #=
-Custom collate functions for sparse CUDA vectors and Flux onehot vectors, because
-the standard implementations don't work.
+Custom collate function for Flux onehot vectors, because the standard implementations don't work.
 =#
-DataLoaders.collate(samples::AbstractVector{<:CUDA.CUSPARSE.CuSparseVector{T, N}}) where {T, N} = cu(hcat(samples...))
-DataLoaders.collate(samples::AbstractVector{<:Flux.OneHotArray}) = cu(hcat(samples...))
+DataLoaders.collate(samples::AbstractVector{<:Flux.OneHotArray}) = hcat(samples...) |> gpu
 
 #=
 MNIST dataset
@@ -23,8 +21,8 @@ struct MNISTDataset
     nSamples::Int
     train::Bool
 end
-TrainMNIST(dir::String) = MNISTDataset(dir, 1000, 1)
-TestMNIST(dir::String) = MNISTDataset(dir, 1000, 0)
+TrainMNIST(dir::String) = MNISTDataset(dir, 60000, 1)
+TestMNIST(dir::String) = MNISTDataset(dir, 10000, 0)
 
 DataLoaders.LearnBase.nobs(dataset::MNISTDataset) = dataset.nSamples
 
@@ -50,8 +48,7 @@ function DataLoaders.LearnBase.getobs!(buffer, dataset::MNISTDataset, i::Int)
     buffer[1] .= data |> gpu
 end
 
-function mnist(batchSize::Int)
-    dir = "./data/MNIST"
+function mnist_lazy(batchSize::Int, dir::String)
     train, test = TrainMNIST(dir), TestMNIST(dir)
 
     trainLoader = DataLoaders.DataLoader(train, batchSize, collate=true, buffered=false)
@@ -63,20 +60,20 @@ end
 #=
 Load all data onto GPU
 =#
-# function mnist(batchSize::Int)
-#     #setup data
-#     dir = "./data/MNIST"
-#     train = MNIST.traindata(Float32, 1:batchSize*10, dir=dir)
-#     test = MNIST.testdata(Float32, dir=dir)
-#
-#     trainLoader = DataLoader((train[1] |> gpu, Flux.onehotbatch(train[2], 0:9) |> gpu), batchsize=batchSize, shuffle=true)
-#     testLoader = DataLoader((test[1] |> gpu, test[2] |> gpu), batchsize=batchSize, shuffle=false)
-#
-#     return trainLoader, testLoader
-# end
+function mnist(batchSize::Int, dir::String)
+    train = MNIST.traindata(Float32, dir=dir)
+    test = MNIST.testdata(Float32, dir=dir)
+
+    trainLoader = Flux.DataLoader((train[1] |> gpu, Flux.onehotbatch(train[2], 0:9) |> gpu), batchsize=batchSize, shuffle=true)
+    testLoader = Flux.DataLoader((test[1] |> gpu, test[2] |> gpu), batchsize=batchSize, shuffle=false)
+
+    return trainLoader, testLoader
+end
 
 #=
 CUDA sparse vector stuff for making onehot vectors and arrays
 =#
+# DataLoaders.collate(samples::AbstractVector{<:CUDA.CUSPARSE.CuSparseVector{T, N}}) where {T, N} = hcat(samples...)
+# using SparseArrays: sparsevec, sparse
 # sparsevec([label+1], [true], 10)
 # sparse(train[2] .+= 1, 1:size(train[2],1), [true for i in 1:size(train[2],1)])
