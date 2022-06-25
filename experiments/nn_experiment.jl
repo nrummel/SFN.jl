@@ -8,7 +8,9 @@ Main experiment logic.
 using Flux
 using CUDA
 using Serialization
-import CubicNewton as CN
+
+include("datasets.jl")
+include("models.jl")
 
 #=
 Check on GPU
@@ -31,10 +33,10 @@ Build and train
 =#
 
 #build model
-model = CN.build_dense(28*28, 10, 6e4, 1) |> gpu
+model = build_dense(28*28, 10, 6e4, 1) |> gpu
 
 #load data
-trainLoader, testLoader = CN.mnist(batchSize, "./data/MNIST")
+trainLoader, testLoader = mnist(batchSize, "./data/MNIST")
 
 #select optimizer and add loss function
 if order == 1
@@ -43,8 +45,8 @@ if order == 1
     opt = Flux.Descent()
 elseif order == 2
     ps, re = Flux.destructure(model)
-    loss(θ,x,y) = CN._logitcrossentropy(re(θ)(x), y)
-    opt = CN.StochasticCubicNewton(typeof(ps), size(ps, 1))
+    loss(θ,x,y) = _logitcrossentropy(re(θ)(x), y)
+    opt = CN.StochasticRSFN(typeof(ps), size(ps, 1))
 end
 
 #check GPU usage
@@ -61,9 +63,9 @@ for epoch = 1:epochs
 
     #Need to do this because ps is a copy of the parameters
     if order == 2
-        acc[epoch] = CN.accuracy(re(ps), testLoader, 0:9)
+        acc[epoch] = accuracy(re(ps), testLoader, 0:9)
     else
-        acc[epoch] = CN.accuracy(model, testLoader, 0:9)
+        acc[epoch] = accuracy(model, testLoader, 0:9)
     end
 end
 

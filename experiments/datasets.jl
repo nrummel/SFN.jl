@@ -4,7 +4,6 @@ Author: Cooper Simpson
 Functionality for working with datasets.
 =#
 
-using .Flux
 using DataLoaders
 using MLDatasets: MNIST
 

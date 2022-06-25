@@ -1,39 +1,36 @@
 #=
 Author: Cooper Simpson
 
-All functionality to interact with Flux.jl and support optimizing models using
-newton type methods.
+All functionality to interact with Flux.jl and support R-SFN optimizer
 =#
 using .Flux
 using Zygote: pullback
 
 #=
-Optimizer for stochastic cubic Newton type methods.
+Optimizer for stochastic R-SFN.
 =#
-Base.@kwdef mutable struct StochasticCubicNewton
-    optimizer::CubicNewtonOptimizer
-    hessianSampleFactor::Float32
-    log = Logger()
+Base.@kwdef mutable struct StochasticRSFN
+    optimizer::RSFN{Float32}
+    sub_sample::Float32
 end
 
 #=
 Constructor.
 
 Input:
-    type :: type of paramaters, gradients, etc.
-    dim :: number of parameters (length of gradient)
-    hessianSampleFactor :: hessian sub sample factor in (0,1] (optional)
+    dim :: dimension of parameters
+    sub_sample :: hessian sub sample factor in (0,1] (optional)
 =#
-function StochasticCubicNewton(type::Type, dim::Int, hessianSampleFactor=0.1)
-    if !((0.0 < hessianSampleFactor) && (hessianSampleFactor <= 1.0))
+function StochasticCubicNewton(dim::Int, sub_sample::Float32=0.1)
+    if !((0.0 < sub_sample) && (sub_sample <= 1.0))
         throw(ArgumentError("Hessian sample factor not in range (0,1]."))
     end
 
-    return StochasticCubicNewton(optimizer=ShiftedLanczosCG(type, dim), hessianSampleFactor=hessianSampleFactor)
+    return StochasticrRSFN(RSFNOptimizer{Float32}(dim), sub_sample)
 end
 
 #=
-Custom Flux training function for a StochasticCubicNewton optimizer
+Custom Flux training function for a StochasticRSFN optimizer
 
 Input:
     f :: model + loss function
@@ -41,12 +38,12 @@ Input:
     trainLoader :: training data
     opt :: cubic newton optimizer
 =#
-function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCubicNewton) where T<:AbstractVector
+function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticRSFN) where T<:AbstractVector
     grads = similar(ps)
 
     #TODO: allocate spsace for subsamples only once
     # sampleSize = opt.hessianSampleFactor*n
-    # subX = 
+    # subX =
     # subY =
 
     @inbounds for (X, Y) in trainLoader
@@ -71,7 +68,7 @@ function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticCu
         grads .= back(one(loss))[1]
 
         #make an update step
-        @time step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop, loss)
+        @time step!(opt.optimizer, θ -> f(θ, X, Y), ps, grads, Hop)
 
         opt.log.hvps += Hop.nProd
     end

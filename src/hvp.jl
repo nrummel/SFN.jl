@@ -1,8 +1,7 @@
 #=
 Author: Cooper Simpson
 
-Associated functionality for solving the cubic sub-problem in
-cubic newton type methods.
+Associated functionality for matrix free Hessian vector multiplication operator.
 =#
 
 using Zygote: pullback
@@ -86,7 +85,7 @@ Input:
 	op :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
+function apply!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
 	op.nProd += 1
 
 	op.dualCache1 .= Dual.(op.x, v)
@@ -96,31 +95,14 @@ function LinearAlgebra.mul!(result::T, op::HvpOperator, v::T) where T<:AbstractV
 end
 
 #=
-Evaluate ∇f(x)ᵀd + 0.5dᵀ∇²f(x)d
+Inplace matrix vector multiplcation with squared HvpOperator
 
 Input:
-	d :: descent direction
-	grads :: gradients
-	hess :: hessian operator
+	result :: matvec storage
+	op :: HvpOperator
+	v :: rhs vector
 =#
-function _quadratic_eval(d::T, grads::T, hess::HvpOperator, res::T) where T<:AbstractVector
-	LinearAlgebra.mul!(res, hess, d)
-	res .+= grads
-	return dot(d, 0.5.*res)
-end
-
-#=
-Evaluate ∇f(x)ᵀd + 0.5dᵀ∇²f(x)d + σ/3||d||³
-
-Input:
-	d :: descent direction
-	grads :: gradients
-	hess :: hessian operator
-	σ :: cubic regularizer
-=#
-function _cubic_eval(d, grads, hess, σ, res)
-	LinearAlgebra.mul!(res, hess, d)
-	res .+= grads
-
-    return dot(d, 0.5.*res) + (σ/3)*norm(d)^3
+function LinearAlgebra.mul!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
+	apply!(result, op, v)
+	apply!(result, op, result)
 end
