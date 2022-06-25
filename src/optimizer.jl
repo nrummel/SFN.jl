@@ -10,18 +10,18 @@ using Krylov: CgLanczosShiftSolver, solve!
 #=
 R-SFN optimizer struct.
 =#
-Base.@kwdef mutable struct RSFN{T<:AbstractVector{S}} where S<:AbstractFloat
+mutable struct RSFNOptimizer{T<:AbstractFloat, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    quad_nodes::T #quadrature nodes
-    quad_weights::T #quadrature weights
-    p::S = 1.0 #regularization power
-    ϵ::S = eps(S) #regularization minimum
+    quad_nodes::S #quadrature nodes
+    quad_weights::S #quadrature weights
+    p::T #regularization power
+    ϵ::T #regularization minimum
 end
 
 #=
 NOTE: FGQ cant currently handle anything other than Float64
 =#
-function RSFNOptimizer(dim::Int, quad_order::Int=32, T::Type{<:AbstractVector{AbstractFloat}}=Vector{Float64})
+function RSFNOptimizer(dim::Int, quad_order::Int=32, S::Type{<:AbstractVector{T}}=Vector{Float64}, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, T)
 
@@ -29,7 +29,7 @@ function RSFNOptimizer(dim::Int, quad_order::Int=32, T::Type{<:AbstractVector{Ab
     nodes, weights = gausslaguerre(quad_order)
     @. nodes = nodes^2 #will always need nodes squared
 
-    return RSFN{T}(solver, nodes, weights)
+    return RSFNOptimizer{S, T}(solver, nodes, weights, p, ϵ)
 end
 
 #=
@@ -41,7 +41,7 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function step!(opt::RSFN, f::Function, x::T, grads::T, hess::HvpOperator) where T<:AbstractVector
+function step!(opt::RSFNOptimizer, f::Function, x::T, grads::T, hess::HvpOperator) where T<:AbstractVector
     #compute regularization
     λ = norm(grads)^opt.p
 
@@ -55,6 +55,7 @@ function step!(opt::RSFN, f::Function, x::T, grads::T, hess::HvpOperator) where 
     #evaluate quadrature and update
     for (i, w) in enumerate(opt.quad_weights)
         @. x -= w*opt.solver.x[i]
+    end
 
     return
 end

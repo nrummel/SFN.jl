@@ -10,7 +10,7 @@ using Zygote: pullback
 Optimizer for stochastic R-SFN.
 =#
 Base.@kwdef mutable struct StochasticRSFN
-    optimizer::RSFN{Float32}
+    optimizer::RSFNOptimizer{Float32}
     sub_sample::Float32
 end
 

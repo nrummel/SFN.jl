@@ -1,18 +1,19 @@
-name = "CubicNewton"
+name = "RSFN"
 uuid = "0c568c97-1dfb-438d-a4b2-d21d63173d9f"
-authors = ["Cooper "]
+authors = ["Cooper"]
 version = "0.1.0"
 
 [deps]
-Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "Flux"]

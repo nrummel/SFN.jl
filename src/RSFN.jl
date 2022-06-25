@@ -13,8 +13,8 @@ using LinearAlgebra
 
 export RSFN
 
-include("utilities.jl")
-include("optimizers.jl")
+include("hvp.jl")
+include("optimizer.jl")
 include("logger.jl")
 
 #=
