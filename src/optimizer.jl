@@ -31,13 +31,13 @@ Input:
 =#
 function RSFNOptimizer(dim::Int, quad_order::Int=32, S::Type{<:AbstractVector{T}}=Vector{Float64}, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
     #krylov solver
-    solver = CgLanczosShiftSolver(dim, dim, quad_order, T)
+    solver = CgLanczosShiftSolver(dim, dim, quad_order, S)
 
     #quadrature
     nodes, weights = gausslaguerre(quad_order)
     @. nodes = nodes^2 #will always need nodes squared
 
-    return RSFNOptimizer{S, T}(solver, nodes, weights, p, ϵ)
+    return RSFNOptimizer{T, S}(solver, nodes, weights, p, ϵ)
 end
 
 #=
@@ -47,9 +47,9 @@ Input:
     opt :: RSFNOptimizer
     x :: initialization
     f :: scalar valued function
-    itmax ::
+    itmax :: maximum iterations
 =#
-function minimize!(opt::RSFNOptimizer, x::T, f::Function, itmax::Int=1e3) where T<:AbstractVector
+function minimize!(opt::RSFNOptimizer, x::S, f::Function; itmax::Int=1000) where S<:AbstractVector{<:AbstractFloat}
     grads = similar(x)
 
     for i = 1:itmax
@@ -57,7 +57,7 @@ function minimize!(opt::RSFNOptimizer, x::T, f::Function, itmax::Int=1e3) where 
         loss, back = pullback(f, x)
         grads .= back(one(loss))[1]
 
-        Hop = HvoOperator(f, x)
+        Hop = HvpOperator(f, x)
 
         #iterate
         step!(opt, x, f, grads, Hop)
@@ -74,19 +74,19 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, x::T, f::Function, grads::T, Hop::HvpOperator) where T<:AbstractVector
+function step!(opt::RSFNOptimizer, x::S, f::Function, grads::S, Hop::HvpOperator) where S<:AbstractVector{<:AbstractFloat}
     #compute regularization
     λ = norm(grads)^opt.p
 
     #compute shifts
-    shifts = opt.nodes .+ λ
+    shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
     solve!(opt.krylov_solver, Hop, grads, shifts)
 
     #evaluate quadrature and update
     for (i, w) in enumerate(opt.quad_weights)
-        @. x -= w*opt.solver.x[i]
+        @. x -= w*opt.krylov_solver.x[i]
     end
 
     return

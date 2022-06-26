@@ -16,11 +16,12 @@ if run_all || "optimizer" in ARGS
         end
 
         #=
-        Test ShiftedLanczosCG optimizer
+        Test R-SFN optimizer
         =#
-        @testset "shifted lanczos cg" begin
-            opt = ShiftedLanczosCG()
+        @testset "R-SFN optimizer" begin
             x = [0.0, 3.0]
+
+            opt = RSFNOptimizer(size(x,1))
 
             @test_nowarn minimize!(opt, x, rosenbrock, itmax=5)
         end
