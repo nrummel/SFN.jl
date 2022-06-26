@@ -2,9 +2,10 @@
 #=
 Author: Cooper Simpson
 
-Main experiment logic.
+Neural network experiment.
 =#
 
+using RSFN
 using Flux
 using CUDA
 using Serialization
@@ -46,7 +47,7 @@ if order == 1
 elseif order == 2
     ps, re = Flux.destructure(model)
     loss(θ,x,y) = _logitcrossentropy(re(θ)(x), y)
-    opt = CN.StochasticRSFN(typeof(ps), size(ps, 1))
+    opt = StochasticRSFN(typeof(ps), size(ps, 1))
 end
 
 #check GPU usage

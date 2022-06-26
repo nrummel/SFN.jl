@@ -49,7 +49,7 @@ Input:
     f :: scalar valued function
     itmax :: maximum iterations
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::Function; itmax::Int=1000) where S<:AbstractVector{<:AbstractFloat}
+function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:AbstractFloat}, {F}}
     grads = similar(x)
 
     for i = 1:itmax
@@ -74,7 +74,7 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, x::S, f::Function, grads::S, Hop::HvpOperator) where S<:AbstractVector{<:AbstractFloat}
+function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, {F}}
     #compute regularization
     λ = norm(grads)^opt.p
 
