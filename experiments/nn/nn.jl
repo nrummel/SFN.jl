@@ -5,6 +5,10 @@ Author: Cooper Simpson
 Neural network experiment.
 =#
 
+using Pkg
+
+Pkg.activate("../.")
+
 using RSFN
 using Flux
 using CUDA

@@ -1,4 +1,5 @@
 [deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 DataLoaders = "2e981812-ef13-4a9c-bfa0-ab13047b12a9"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
