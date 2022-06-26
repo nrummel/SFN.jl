@@ -19,7 +19,15 @@ mutable struct RSFNOptimizer{T<:AbstractFloat, S<:AbstractVector{T}}
 end
 
 #=
+Outer constructor
+
 NOTE: FGQ cant currently handle anything other than Float64
+
+Input:
+    dim :: dimension of parameters
+    quad_order :: number of quadrature nodes
+    p :: regularization power
+    ϵ :: regularization minimum
 =#
 function RSFNOptimizer(dim::Int, quad_order::Int=32, S::Type{<:AbstractVector{T}}=Vector{Float64}, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
     #krylov solver
@@ -33,15 +41,40 @@ function RSFNOptimizer(dim::Int, quad_order::Int=32, S::Type{<:AbstractVector{T}
 end
 
 #=
+Repeatedly applies the R-SFN iteration to minimize the function.
+
+Input:
+    opt :: RSFNOptimizer
+    x :: initialization
+    f :: scalar valued function
+    itmax ::
+=#
+function minimize!(opt::RSFNOptimizer, x::T, f::Function, itmax::Int=1e3) where T<:AbstractVector
+    grads = similar(x)
+
+    for i = 1:itmax
+        #construct gradient and hvp operator
+        loss, back = pullback(f, x)
+        grads .= back(one(loss))[1]
+
+        Hop = HvoOperator(f, x)
+
+        #iterate
+        step!(opt, x, f, grads, Hop)
+    end
+end
+
+#=
 Computes an update step according to the shifted Lanczos-CG update rule.
 
 Input:
-    f :: scalar valued function
+    opt :: RSFNOptimizer
     x :: current iterate
+    f :: scalar valued function
     grads :: function gradients
     hess :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, f::Function, x::T, grads::T, hess::HvpOperator) where T<:AbstractVector
+function step!(opt::RSFNOptimizer, x::T, f::Function, grads::T, Hop::HvpOperator) where T<:AbstractVector
     #compute regularization
     λ = norm(grads)^opt.p
 
@@ -49,8 +82,7 @@ function step!(opt::RSFNOptimizer, f::Function, x::T, grads::T, hess::HvpOperato
     shifts = opt.nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    #NOTE: Could pre-allocate the space for the integrand
-    integrand = solve!(opt.krylov_solver, hess, grads, shifts)
+    solve!(opt.krylov_solver, Hop, grads, shifts)
 
     #evaluate quadrature and update
     for (i, w) in enumerate(opt.quad_weights)

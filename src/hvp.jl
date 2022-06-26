@@ -60,36 +60,36 @@ end
 Update internals of operator inplace.
 
 Input:
-	op :: HvpOperator
+	Hop :: HvpOperator
 	f :: scalar valued function
 	x :: input to f
 =#
-# function update!(op::HvpOperator, f, x<:AbstractVector)
-# 	op.f = f
-# 	op.x = x
+# function update!(Hop::HvpOperator, f, x<:AbstractVector)
+# 	Hop.f = f
+# 	Hop.x = x
 # 	return true
 # end
 
 #=
 Base implementations for HvpOperator
 =#
-Base.eltype(op::HvpOperator{F, T, I}) where {F, T, I} = T
-Base.size(op::HvpOperator) = (op.dim, op.dim)
-Base.:*(op::HvpOperator, v::AbstractVector) = _hvp(op.f, op.x, v)
+Base.eltype(Hop::HvpOperator{F, T, I}) where {F, T, I} = T
+Base.size(Hop::HvpOperator) = (Hop.dim, Hop.dim)
+Base.:*(Hop::HvpOperator, v::AbstractVector) = _hvp(Hop.f, Hop.x, v)
 
 #=
 Inplace matrix vector multiplcation with HvpOperator.
 
 Input:
 	result :: matvec storage
-	op :: HvpOperator
+	Hop :: HvpOperator
 	v :: rhs vector
 =#
-function apply!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
-	op.nProd += 1
+function apply!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
+	Hop.nProd += 1
 
-	op.dualCache1 .= Dual.(op.x, v)
-	val, back = pullback(op.f, op.dualCache1)
+	Hop.dualCache1 .= Dual.(Hop.x, v)
+	val, back = pullback(Hop.f, Hop.dualCache1)
 
 	result .= partials.(back(one(val))[1], 1)
 end
@@ -99,10 +99,10 @@ Inplace matrix vector multiplcation with squared HvpOperator
 
 Input:
 	result :: matvec storage
-	op :: HvpOperator
+	Hop :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::T, op::HvpOperator, v::T) where T<:AbstractVector
-	apply!(result, op, v)
-	apply!(result, op, result)
+function LinearAlgebra.mul!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
+	apply!(result, Hop, v)
+	apply!(result, Hop, result)
 end

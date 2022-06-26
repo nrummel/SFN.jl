@@ -14,8 +14,8 @@ using LinearAlgebra
 export RSFN
 
 include("hvp.jl")
-include("optimizer.jl")
 include("logger.jl")
+include("optimizer.jl")
 
 #=
 If Flux is loaded then export compatability functions.

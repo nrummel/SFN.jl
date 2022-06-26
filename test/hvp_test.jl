@@ -1,13 +1,13 @@
 #=
 Author: Cooper Simpson
 
-Tests for functionality found in src/utilities.jl -- helpful functionality.
+Tests for functionality found in src/hvp.jl -- helpful functionality.
 =#
 
 using LinearAlgebra
 
-if run_all || "utilities" in ARGS
-    @testset "utilities" begin
+if run_all || "hvp" in ARGS
+    @testset "hvp" begin
 
         #define the quadratic
         n = 10
@@ -23,7 +23,7 @@ if run_all || "utilities" in ARGS
         Test basic hvp function
         =#
         @testset "basic hvp" begin
-            @test CubicNewton._hvp(f, x, v) ≈ expected
+            @test RSFN._hvp(f, x, v) ≈ expected
         end
 
         #=

@@ -1,12 +1,11 @@
 #=
 Author: Cooper Simpson
 
-Tests for functionality found in src/optimizers.jl -- the specific CubicNewton
-optimizers.
+Tests for functionality found in src/optimizer.jl -- the RSFN optimizer.
 =#
 
-if run_all || "optimizers" in ARGS
-    @testset "optimizers" begin
+if run_all || "optimizer" in ARGS
+    @testset "optimizer" begin
 
         function rosenbrock(x)
             res = 0.0
@@ -23,14 +22,7 @@ if run_all || "optimizers" in ARGS
             opt = ShiftedLanczosCG()
             x = [0.0, 3.0]
 
-            @test_nowarn minimize!(opt, rosenbrock, x, itmax=5) #just make sure it runs
+            @test_nowarn minimize!(opt, x, rosenbrock, itmax=5)
         end
-
-        #=
-        Test Eigen optimizer
-        =#
-        # @testset "eigen" begin
-        #     #TODO
-        # end
     end
 end
