@@ -38,7 +38,9 @@ function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}
 
     #quadrature
     nodes, weights = gausslaguerre(quad_order)
+
     @. nodes = nodes^2 #will always need nodes squared
+    weights *= 2/pi #always have this constant outside integral
 
     return RSFNOptimizer{T, type}(solver, nodes, weights, M, p, ϵ)
 end
@@ -65,6 +67,8 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
         #iterate
         step!(opt, x, f, grads, Hop)
     end
+
+    return nothing
 end
 
 #=
@@ -92,5 +96,5 @@ function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where
         @. x -= w*opt.krylov_solver.x[i]
     end
 
-    return
+    return nothing
 end

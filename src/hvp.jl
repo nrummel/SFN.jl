@@ -17,6 +17,7 @@ Input:
 =#
 function _hvp(f, x, v)
 	val, back = pullback(f, Dual.(x,v))
+	
 	return partials.(back(one(val))[1], 1)
 end
 
@@ -53,6 +54,7 @@ Input:
 =#
 function HvpOperator(f::Function, x::T) where T<:AbstractVector
 	dualCache1 = Dual.(x, similar(x))
+
 	return HvpOperator(f, x, dualCache1, size(x, 1), 0)
 end
 
@@ -92,6 +94,8 @@ function apply!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
 	val, back = pullback(Hop.f, Hop.dualCache1)
 
 	result .= partials.(back(one(val))[1], 1)
+
+	return nothing
 end
 
 #=
@@ -105,4 +109,6 @@ Input:
 function LinearAlgebra.mul!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
 	apply!(result, Hop, v)
 	apply!(result, Hop, result)
+
+	return nothing
 end

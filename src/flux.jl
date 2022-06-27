@@ -72,6 +72,8 @@ function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticRS
 
         opt.log.hvps += Hop.nProd
     end
+
+    return nothing
 end
 
 #=
