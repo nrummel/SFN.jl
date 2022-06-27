@@ -14,6 +14,7 @@ mutable struct RSFNOptimizer{T<:AbstractFloat, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
+    M::T #hessian lipschitz constant
     p::T #regularization power
     ϵ::T #regularization minimum
 end
@@ -25,19 +26,21 @@ NOTE: FGQ cant currently handle anything other than Float64
 
 Input:
     dim :: dimension of parameters
+    type :: parameter type
     quad_order :: number of quadrature nodes
+    M :: hessian lipschitz constant
     p :: regularization power
     ϵ :: regularization minimum
 =#
-function RSFNOptimizer(dim::Int, quad_order::Int=32, S::Type{<:AbstractVector{T}}=Vector{Float64}, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}; quad_order::Int=32, M::T=1.0, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
     #krylov solver
-    solver = CgLanczosShiftSolver(dim, dim, quad_order, S)
+    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     #quadrature
     nodes, weights = gausslaguerre(quad_order)
     @. nodes = nodes^2 #will always need nodes squared
 
-    return RSFNOptimizer{T, S}(solver, nodes, weights, p, ϵ)
+    return RSFNOptimizer{T, type}(solver, nodes, weights, M, p, ϵ)
 end
 
 #=
@@ -76,7 +79,7 @@ Input:
 =#
 function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
-    λ = norm(grads)^opt.p
+    λ = (opt.M*norm(grads))^opt.p + opt.ϵ
 
     #compute shifts
     shifts = opt.quad_nodes .+ λ

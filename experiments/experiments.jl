@@ -18,10 +18,10 @@ include("functions.jl")
 
 #Parse arguments
 parser = ArgParseSettings()
-@add_arg_table parse begin
-    "--function, -f"
+@add_arg_table parser begin
+    "--function", "-f"
         arg_type = String
-    "--dimension, -d"
+    "--dimension", "-d"
         arg_type = Int
         default = 10
     "--itmax"
@@ -31,24 +31,23 @@ end
 
 args = parse_args(ARGS, parser)
 
-func = eval(Meta.parse(args["function"]))
 dim = args["dimension"]
 
-if func == "michalewicz":
-    func = michalewicz
-    x = randn(dim)
-elseif func == "rosenbrock"
+if args["function"] == "rosenbrock"
     func = rosenbrock
-    x = randn(dim)
-elseif func == "matfact"
-    func = matfact
-    x = randn(dim)
+    x = zeros(dim)
+    exact = 0.0
+elseif args["function"] == "matfact"
+    M = randn((dim, dim*2)) #make this rank r
+    r = 2
+    func = x -> matfact(x, M, r)
+    x = randn(r*sum(size(M)))
+    exact = 0.0
+end
 
 #Optimize
 opt = RSFNOptimizer(size(x, 1))
 
 minimize!(opt, x, rosenbrock, itmax=args["itmax"])
 
-exact = ones(dim)
-
-println(LA.norm(exact-x)/LA.norm(exact))
+println(abs(func(x)-exact))
