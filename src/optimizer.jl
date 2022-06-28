@@ -5,18 +5,18 @@ R-SFN optimizer.
 =#
 
 using FastGaussQuadrature: gausslaguerre
-using Krylov: CgLanczosShiftSolver, solve!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 
 #=
 R-SFN optimizer struct.
 =#
 mutable struct RSFNOptimizer{T<:AbstractFloat, S<:AbstractVector{T}}
-    krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    quad_nodes::S #quadrature nodes
-    quad_weights::S #quadrature weights
     M::T #hessian lipschitz constant
     p::T #regularization power
     ϵ::T #regularization minimum
+    quad_nodes::S #quadrature nodes
+    quad_weights::S #quadrature weights
+    krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
 end
 
 #=
@@ -27,12 +27,12 @@ NOTE: FGQ cant currently handle anything other than Float64
 Input:
     dim :: dimension of parameters
     type :: parameter type
-    quad_order :: number of quadrature nodes
     M :: hessian lipschitz constant
     p :: regularization power
     ϵ :: regularization minimum
+    quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}; quad_order::Int=32, M::T=1.0, p::T=1.0, ϵ::T=eps(T)) where T<:AbstractFloat
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}; M::T=1.0, p::T=1.0, ϵ::T=eps(T), quad_order::Int=32) where T<:AbstractFloat
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
@@ -40,9 +40,9 @@ function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}
     nodes, weights = gausslaguerre(quad_order)
 
     @. nodes = nodes^2 #will always need nodes squared
-    weights *= 2/pi #always have this constant outside integral
+    @. weights = (2.0/pi)*weights #will always multiply by this constant
 
-    return RSFNOptimizer{T, type}(solver, nodes, weights, M, p, ϵ)
+    return RSFNOptimizer(M, p, ϵ, nodes, weights, solver)
 end
 
 #=
@@ -89,11 +89,11 @@ function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    solve!(opt.krylov_solver, Hop, grads, shifts)
+    cg_lanczos_shift!(opt.krylov_solver, Hop, grads, shifts)
 
     #evaluate quadrature and update
-    for (i, w) in enumerate(opt.quad_weights)
-        @. x -= w*opt.krylov_solver.x[i]
+    @simd for i = 1:size(shifts, 1)
+        @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
     end
 
     return nothing

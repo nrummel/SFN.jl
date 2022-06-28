@@ -9,9 +9,9 @@ using Zygote: pullback
 #=
 Optimizer for stochastic R-SFN.
 =#
-Base.@kwdef mutable struct StochasticRSFN
-    optimizer::RSFNOptimizer{Float32}
-    sub_sample::Float32
+mutable struct StochasticRSFN{T<:AbstractFloat}
+    optimizer::RSFNOptimizer{T}
+    sub_sample::T
 end
 
 #=
@@ -21,24 +21,24 @@ Input:
     dim :: dimension of parameters
     sub_sample :: hessian sub sample factor in (0,1] (optional)
 =#
-function StochasticCubicNewton(dim::Int, sub_sample::Float32=0.1)
+function StochasticCubicNewton(dim::Int, sub_sample::T=0.1) where T<:AbstractFloat
     if !((0.0 < sub_sample) && (sub_sample <= 1.0))
         throw(ArgumentError("Hessian sample factor not in range (0,1]."))
     end
 
-    return StochasticrRSFN(RSFNOptimizer{Float32}(dim), sub_sample)
+    return StochasticrRSFN(RSFNOptimizer(dim), sub_sample)
 end
 
 #=
 Custom Flux training function for a StochasticRSFN optimizer
 
 Input:
-    f :: model + loss function
-    ps :: model params
-    trainLoader :: training data
     opt :: cubic newton optimizer
+    ps :: model params
+    f :: model + loss function
+    trainLoader :: training data
 =#
-function Flux.Optimise.train!(f::Function, ps::T, trainLoader, opt::StochasticRSFN) where T<:AbstractVector
+function Flux.Optimise.train!(opt::StochasticRSFN, ps::T, f::F, trainLoader::L) where {T<:AbstractVector, F, L}
     grads = similar(ps)
 
     #TODO: allocate spsace for subsamples only once
@@ -85,9 +85,9 @@ NOTE: Assumes everything is trainable
 Input:
     model :: Flux model
 =#
-function make_flat(model)
+function make_flat(model::M, dim::Int, type::Type{AbstractVector{T}}) where {T<:AbstractFloat, M}
     #grab all the paramaters
-    ps = AbstractVector[]
+    ps = type(dim)
     fmap(model) do p
         p isa AbstractArray && push!(arrays, vec(p))
         return x

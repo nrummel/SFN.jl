@@ -15,21 +15,21 @@ Input:
 	x :: input to f
 	v :: vector
 =#
-function _hvp(f, x, v)
+function _hvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	val, back = pullback(f, Dual.(x,v))
-	
+
 	return partials.(back(one(val))[1], 1)
 end
 
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct HvpOperator{F, T, I<:Int}
+mutable struct HvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}}
 	f::F
-	x::AbstractVector{T}
-	dualCache1::AbstractArray{Dual{Nothing, T, 1}}
-	dim::I
-	nProd::I
+	dim::Int
+	x::S
+	dualCache1::AbstractVector{Dual{Nothing, T, 1}}
+	nProd::Int
 end
 
 #=
@@ -52,10 +52,10 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function HvpOperator(f::Function, x::T) where T<:AbstractVector
+function HvpOperator(f::F, x::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	dualCache1 = Dual.(x, similar(x))
 
-	return HvpOperator(f, x, dualCache1, size(x, 1), 0)
+	return HvpOperator(f, size(x, 1), x, dualCache1, 0)
 end
 
 #=
@@ -75,9 +75,9 @@ Input:
 #=
 Base implementations for HvpOperator
 =#
-Base.eltype(Hop::HvpOperator{F, T, I}) where {F, T, I} = T
+Base.eltype(Hop::HvpOperator{F, T, S}) where {F, T, S} = T
 Base.size(Hop::HvpOperator) = (Hop.dim, Hop.dim)
-Base.:*(Hop::HvpOperator, v::AbstractVector) = _hvp(Hop.f, Hop.x, v)
+Base.:*(Hop::HvpOperator, v::S) where {S} = _hvp(Hop.f, Hop.x, v)
 
 #=
 Inplace matrix vector multiplcation with HvpOperator.
@@ -87,7 +87,7 @@ Input:
 	Hop :: HvpOperator
 	v :: rhs vector
 =#
-function apply!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
+function apply!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hop.nProd += 1
 
 	Hop.dualCache1 .= Dual.(Hop.x, v)
@@ -106,7 +106,7 @@ Input:
 	Hop :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::T, Hop::HvpOperator, v::T) where T<:AbstractVector
+function LinearAlgebra.mul!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	apply!(result, Hop, v)
 	apply!(result, Hop, result)
 
