@@ -46,8 +46,7 @@ elseif args["function"] == "matfact"
 end
 
 #Optimize
-opt = RSFNOptimizer(size(x, 1))
+opt = RSFNOptimizer(size(x, 1), M=10, quad_order=100)
 
-minimize!(opt, x, rosenbrock, itmax=args["itmax"])
-
+@time minimize!(opt, x, rosenbrock, itmax=args["itmax"])
 println(abs(func(x)-exact))

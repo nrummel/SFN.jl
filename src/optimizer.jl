@@ -10,10 +10,10 @@ using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 #=
 R-SFN optimizer struct.
 =#
-mutable struct RSFNOptimizer{T<:AbstractFloat, S<:AbstractVector{T}}
-    M::T #hessian lipschitz constant
-    p::T #regularization power
-    ϵ::T #regularization minimum
+mutable struct RSFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
+    M::T1 #hessian lipschitz constant
+    p::T1 #regularization power
+    ϵ::T2#regularization minimum
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
@@ -32,7 +32,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T}}=Vector{Float64}; M::T=1.0, p::T=1.0, ϵ::T=eps(T), quad_order::Int=32) where T<:AbstractFloat
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, p::T1=2, ϵ::T2=eps(T2), quad_order::Int=10) where {T1<:Real, T2<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
@@ -93,7 +93,7 @@ function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where
 
     #evaluate quadrature and update
     @simd for i = 1:size(shifts, 1)
-        @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        @inbounds x .-= opt.quad_weights[i].*opt.krylov_solver.x[i]
     end
 
     return nothing
