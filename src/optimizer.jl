@@ -10,10 +10,10 @@ using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 #=
 R-SFN optimizer struct.
 =#
-mutable struct RSFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
+mutable struct RSFNOptimizer{T1,T2<:Real, T3<:AbstractFloat, S<:AbstractVector{T2}}
     M::T1 #hessian lipschitz constant
-    p::T1 #regularization power
-    ϵ::T2#regularization minimum
+    p::T2 #regularization power
+    ϵ::T3#regularization minimum
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
@@ -32,15 +32,15 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, p::T1=2, ϵ::T2=eps(T2), quad_order::Int=10) where {T1<:Real, T2<:AbstractFloat}
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, p::T2=2, ϵ::T3=eps(T3), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     #quadrature
-    nodes, weights = gausslaguerre(quad_order)
+    nodes, weights = gausslaguerre(quad_order, α=0, reduced=true)
 
-    @. nodes = nodes^2 #will always need nodes squared
-    @. weights = (2.0/pi)*weights #will always multiply by this constant
+    @. weights = (2/pi)*weights*exp(nodes)
+    @. nodes = nodes^2
 
     return RSFNOptimizer(M, p, ϵ, nodes, weights, solver)
 end
