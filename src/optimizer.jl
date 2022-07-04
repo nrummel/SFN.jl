@@ -55,20 +55,25 @@ Input:
     itmax :: maximum iterations
 =#
 function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:AbstractFloat}, F}
+    logger = Logger()
+
     grads = similar(x)
 
     for i = 1:itmax
         #construct gradient and hvp operator
         loss, back = pullback(f, x)
         grads .= back(one(loss))[1]
+        logger.gcalls += 1
 
         Hop = HvpOperator(f, x)
 
         #iterate
         step!(opt, x, f, grads, Hop)
+
+        logger.hcalls += Hop.nProd
     end
 
-    return nothing
+    return logger
 end
 
 #=
