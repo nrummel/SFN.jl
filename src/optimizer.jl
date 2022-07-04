@@ -10,7 +10,7 @@ using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 #=
 R-SFN optimizer struct.
 =#
-mutable struct RSFNOptimizer{T1,T2<:Real, T3<:AbstractFloat, S<:AbstractVector{T2}}
+mutable struct RSFNOptimizer{T1,T2<:Real, T3<:AbstractFloat, S<:AbstractVector{T3}}
     M::T1 #hessian lipschitz constant
     p::T2 #regularization power
     ϵ::T3#regularization minimum
@@ -32,12 +32,12 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, p::T2=2, ϵ::T3=eps(T3), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=2, ϵ::T3=eps(Float64), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     #quadrature
-    nodes, weights = gausslaguerre(quad_order, α=0, reduced=true)
+    nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2

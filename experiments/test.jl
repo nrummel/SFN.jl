@@ -27,8 +27,8 @@ rosenbrock(x1)
 # ╔═╡ a0737f74-127c-4c2d-8076-e1ec08da37d7
 begin
 	x2 = zeros(dim)
-	opt = RSFNOptimizer(dim, M=0, ϵ=0.0, quad_order=10)
-	minimize!(opt, x2, rosenbrock, itmax=100)
+	opt = RSFNOptimizer(dim, M=0, ϵ=0.0, quad_order=200)
+	@time minimize!(opt, x2, rosenbrock, itmax=15)
 end
 
 # ╔═╡ 82f19623-bc3d-44a4-a1be-a0e20627c2ea
