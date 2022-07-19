@@ -1,7 +1,9 @@
-using LinearAlgebra
-using Krylov: CgLanczosSolver, cg_lanczos!
-using Zygote: pullback
-using ForwardDiff: partials, Dual
+import LinearAlgebra as LA
+using Krylov: CgLanczosShiftSolver, cg_lanczos!
+using Zygote: pullback, gradient
+using ForwardDiff: partials, Dual, hessian
+using RSFN: Logger, RSFNOptimizer, RHvpOperator, step!
+using BenchmarkTools
 
 function rosenbrock(x::T) where T<:AbstractVector
     res = 0.0
@@ -11,7 +13,21 @@ function rosenbrock(x::T) where T<:AbstractVector
     return res
 end
 
-mutable struct HvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}}
+function gradient_descent!(x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:AbstractFloat}, F}
+    grads = similar(x)
+
+    for i = 1:itmax
+        #construct gradient and hvp operator
+        loss, back = pullback(f, x)
+        grads .= back(one(loss))[1]
+
+        x .-= LA.dot(grads, x)
+    end
+
+    return nothing
+end
+
+mutable struct HvpOp{F, T<:AbstractFloat, S<:AbstractVector{T}}
 	f::F
 	dim::Int
 	x::S
@@ -19,16 +35,16 @@ mutable struct HvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}}
 	nProd::Int
 end
 
-function Hvp(f::F, x::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function HvpOp(f::F, x::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	dualCache1 = Dual.(x, similar(x))
 
-	return HvpOperator(f, size(x, 1), x, dualCache1, 0)
+	return HvpOp(f, size(x, 1), x, dualCache1, 0)
 end
 
-Base.eltype(Hop::HvpOperator{F, T, S}) where {F, T, S} = T
-Base.size(Hop::HvpOperator) = (Hop.dim, Hop.dim)
+Base.eltype(Hop::HvpOp{F, T, S}) where {F, T, S} = T
+Base.size(Hop::HvpOp) = (Hop.dim, Hop.dim)
 
-function LinearAlgebra.mul!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function LA.mul!(result::S, Hop::HvpOp, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hop.nProd += 1
 
 	Hop.dualCache1 .= Dual.(Hop.x, v)
@@ -40,7 +56,8 @@ function LinearAlgebra.mul!(result::S, Hop::HvpOperator, v::S) where S<:Abstract
 end
 
 function newton!(x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:AbstractFloat}, F}
-    solver = CgLanczosSolver(size(x,1), size(x,1), S)
+    solver = CgLanczosShiftSolver(size(x,1), size(x,1), 1, S)
+    logger = Logger()
 
     grads = similar(x)
 
@@ -48,13 +65,56 @@ function newton!(x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:Abstrac
         #construct gradient and hvp operator
         loss, back = pullback(f, x)
         grads .= back(one(loss))[1]
+        logger.gcalls += 1
 
-        Hop = Hvp(f, x)
+        Hop = HvpOp(f, x)
 
-        cg_lanczos!(solver, Hop, grads)
+        newton_step!(solver, x, f, grads, Hop)
 
-        x .-= solver.x
+        logger.hcalls += Hop.nProd
     end
 
-    return nothing
+    return logger
+end
+
+function newton_step!(solver::CgLanczosShiftSolver, x::S, f::F, grads::S, Hop::HvpOp) where {S<:AbstractVector{<:AbstractFloat}, F}
+    cg_lanczos!(solver, Hop, grads, 1e-6)
+
+    x .-= solver.x[1]
+end
+
+function newton_step!(x::S, f::F, grads::S, hess::H) where {S<:AbstractVector{<:AbstractFloat}, F, H}
+    x .-= LA.Symmetric(hess)\grads
+end
+
+function sfn_step!(x::S, f::F, grads::S, hess::H) where {S<:AbstractVector{<:AbstractFloat}, F, H}
+    D, V = LA.eigen(LA.Symmetric(hess))
+    @. D = inv(abs(D))
+    hess .= V*LA.Diagonal(D)*transpose(V)
+
+    x .-= hess*grads
+end
+
+function eval_newton(f, n)
+	solver = CgLanczosShiftSolver(n, n, 1, Vector{Float64})
+
+	return @benchmark newton_step!($solver, x, $f, grads, HvpOp($f, x)) setup=begin; x=randn($n); grads=gradient($f,x)[1];end
+end
+
+function eval_newton(f, H, n)
+	return @benchmark newton_step!(x, $f, grads, $H(x)) setup=begin; x=randn($n); grads=gradient($f,x)[1];end
+end
+
+function eval_sfn(f, n)
+	return @benchmark sfn_step!(x, $f, grads, hessian($f, x)) setup=begin; x=randn($n); grads=gradient($f,x)[1];end
+end
+
+function eval_sfn(f, H, n)
+	return @benchmark sfn_step!(x, $f, grads, $H(x)) setup=begin; x=randn($n); grads=gradient($f,x)[1];end
+end
+
+function eval_rsfn(f, n, quad_order=20)
+	opt = RSFNOptimizer(n, M=0, ϵ=0.0, quad_order=quad_order)
+
+	return @benchmark step!($opt, x, $f, grads, RHvpOperator($f, x)) setup=begin; x=randn($n); grads=gradient($f,x)[1];end
 end

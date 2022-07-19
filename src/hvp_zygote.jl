@@ -15,7 +15,7 @@ Input:
 	x :: input to f
 	v :: vector
 =#
-function _hvp_zygote(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function _zhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	val, back = pullback(f, Dual.(x,v))
 
 	return partials.(back(one(val))[1], 1)
@@ -24,7 +24,7 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}}
+mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
 	f::F
 	x::S
 	dualCache1::AbstractVector{Dual{Nothing,T,1}}

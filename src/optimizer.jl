@@ -58,7 +58,7 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
     logger = Logger()
 
     grads = similar(x)
-    Hop = HvpOperator(f, x)
+    Hop = RHvpOperator(f, x)
 
     for i = 1:itmax
         #construct gradient and hvp operator
@@ -69,9 +69,9 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
         #iterate
         step!(opt, x, f, grads, Hop)
 
-        update!(Hop, x)
-
         logger.hcalls += Hop.nProd
+
+        update!(Hop, x)
     end
 
     return logger

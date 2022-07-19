@@ -16,7 +16,7 @@ Input:
 	x :: input to f
 	v :: vector
 =#
-function _hvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function _rhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	dual = Dual.(x,v)
 
 	return partials.(gradient(f, dual), 1)
@@ -25,7 +25,7 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct HvpOperator{F, R<:AbstractFloat, S<:AbstractVector{R}, T<:AbstractTape}
+mutable struct RHvpOperator{F, R<:AbstractFloat, S<:AbstractVector{R}, T<:AbstractTape} <: HvpOperator
 	x::S
 	dualCache1::Vector{Dual{F, R, 1}}
 	dualCache2::Vector{Dual{F, R, 1}}
@@ -34,17 +34,17 @@ mutable struct HvpOperator{F, R<:AbstractFloat, S<:AbstractVector{R}, T<:Abstrac
 end
 
 #=
-Base implementations for HvpOperator
+Base implementations for RHvpOperator
 =#
-Base.eltype(Hop::HvpOperator{F, R, S, T}) where {F, R, S, T} = R
-Base.size(Hop::HvpOperator) = (size(Hop.x,1), size(Hop.x,1))
+Base.eltype(Hop::RHvpOperator{F, R, S, T}) where {F, R, S, T} = R
+Base.size(Hop::RHvpOperator) = (size(Hop.x,1), size(Hop.x,1))
 
 #=
-In place update of HvpOperator
+In place update of RHvpOperator
 Input:
 	x :: new input to f
 =#
-function update!(Hop::HvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
+function update!(Hop::RHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hop.x .= x
 	Hop.nProd = 0
 
@@ -58,7 +58,7 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function HvpOperator(f::F, x::S, compile_tape=true) where {F, S<:AbstractVector{<:AbstractFloat}}
+function RHvpOperator(f::F, x::S, compile_tape=true) where {F, S<:AbstractVector{<:AbstractFloat}}
 	dualCache1 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 	dualCache2 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 
@@ -66,18 +66,18 @@ function HvpOperator(f::F, x::S, compile_tape=true) where {F, S<:AbstractVector{
 
 	compile_tape ? tape = compile(tape) : tape
 
-	return HvpOperator(x, dualCache1, dualCache2, tape, 0)
+	return RHvpOperator(x, dualCache1, dualCache2, tape, 0)
 end
 
 #=
-Inplace matrix vector multiplcation with HvpOperator.
+Inplace matrix vector multiplcation with RHvpOperator.
 
 Input:
 	result :: matvec storage
-	Hop :: HvpOperator
+	Hop :: RHvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function apply!(result::S, Hop::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hop.nProd += 1
 
 	Hop.dualCache1 .= Dual{typeof(Tag(Nothing, eltype(v))),eltype(v),1}.(Hop.x, Partials.(Tuple.(v)))
@@ -90,14 +90,14 @@ function apply!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:Abs
 end
 
 #=
-Inplace matrix vector multiplcation with squared HvpOperator
+Inplace matrix vector multiplcation with squared RHvpOperator
 
 Input:
 	result :: matvec storage
-	Hop :: HvpOperator
+	Hop :: RHvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function LinearAlgebra.mul!(result::S, Hop::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	apply!(result, Hop, v)
 	apply!(result, Hop, result)
 
