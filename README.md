@@ -2,8 +2,7 @@
 
 ## TODO
 - HVP operator:
-  - Implement a new hvp operator using ReverseDiff.jl (or something) instead of Zygote.jl for the backward mode step
-  - Add appropriate tag instead of nothing for Dual in hvp operator
+  - Check if I am doing Tags correctly for Dual, and also add Tag to Zygote hvp operator
   - Add gradient config stuff to ForwardDiff Dual (and maybe reverse part)
   - Only construct hvp operator once and then update it in loops
   - Is it possible to only update the partials value of Dual? It seems unlikely since it is immutable

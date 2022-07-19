@@ -40,6 +40,18 @@ Base.eltype(Hop::HvpOperator{F, R, S, T}) where {F, R, S, T} = R
 Base.size(Hop::HvpOperator) = (size(Hop.x,1), size(Hop.x,1))
 
 #=
+In place update of HvpOperator
+Input:
+	x :: new input to f
+=#
+function update!(Hop::HvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
+	Hop.x .= x
+	Hop.nProd = 0
+
+	return nothing
+end
+
+#=
 Constructor.
 
 Input:

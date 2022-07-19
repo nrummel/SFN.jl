@@ -32,7 +32,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=2, ϵ::T3=eps(Float64), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=1, ϵ::T3=eps(Float64), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
@@ -58,6 +58,7 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
     logger = Logger()
 
     grads = similar(x)
+    Hop = HvpOperator(f, x)
 
     for i = 1:itmax
         #construct gradient and hvp operator
@@ -65,10 +66,10 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
         grads .= back(one(loss))[1]
         logger.gcalls += 1
 
-        Hop = HvpOperator(f, x)
-
         #iterate
         step!(opt, x, f, grads, Hop)
+
+        update!(Hop, x)
 
         logger.hcalls += Hop.nProd
     end
