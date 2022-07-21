@@ -1,5 +1,5 @@
 import LinearAlgebra as LA
-using Krylov: CgLanczosShiftSolver, cg_lanczos!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 using Zygote: pullback, gradient
 using ForwardDiff: partials, Dual, hessian
 using RSFN: Logger, RSFNOptimizer, RHvpOperator, step!
@@ -78,17 +78,17 @@ function newton!(x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:Abstrac
 end
 
 function newton_step!(solver::CgLanczosShiftSolver, x::S, f::F, grads::S, Hop::HvpOp) where {S<:AbstractVector{<:AbstractFloat}, F}
-    cg_lanczos!(solver, Hop, grads, 1e-6)
+    cg_lanczos_shift!(solver, Hop, grads, [1e-6])
 
     x .-= solver.x[1]
 end
 
 function newton_step!(x::S, f::F, grads::S, hess::H) where {S<:AbstractVector{<:AbstractFloat}, F, H}
-    x .-= LA.Symmetric(hess)\grads
+    x .-= LA.Symmetric(hess+1e-6*LA.I(size(hess,2)))\grads
 end
 
 function sfn_step!(x::S, f::F, grads::S, hess::H) where {S<:AbstractVector{<:AbstractFloat}, F, H}
-    D, V = LA.eigen(LA.Symmetric(hess))
+    D, V = LA.eigen(LA.Symmetric(hess + 1e-6*LA.I(size(hess,2))))
     @. D = inv(abs(D))
     hess .= V*LA.Diagonal(D)*transpose(V)
 
