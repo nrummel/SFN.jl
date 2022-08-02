@@ -17,7 +17,6 @@ abstract type HvpOperator end
 
 include("hvp_rdiff.jl")
 include("hvp_zygote.jl")
-include("logger.jl")
 include("optimizer.jl")
 
 #=

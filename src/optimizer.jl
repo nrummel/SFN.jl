@@ -32,13 +32,23 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=1, ϵ::T3=eps(Float64), quad_order::Int=32) where {T1,T2<:Real, T3<:AbstractFloat}
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=1, ϵ::T3=eps(Float64), quad_order::Int=20) where {T1,T2<:Real, T3<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
+    if size(nodes, 1) < quad_order
+        println("Quadrature weight precision reached, using $(size(nodes,1)) quadrature locations.")
+    end
+
+    #=
+    NOTE: Performing some extra global operations here.
+    - Integral constant
+    - Rescaling weights
+    - Squaring nodes
+    =#
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
@@ -54,8 +64,8 @@ Input:
     f :: scalar valued function
     itmax :: maximum iterations
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:AbstractVector{<:AbstractFloat}, F}
-    logger = Logger()
+function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+    fval = []
 
     grads = similar(x)
     Hop = RHvpOperator(f, x)
@@ -64,17 +74,20 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {S<:Ab
         #construct gradient and hvp operator
         loss, back = pullback(f, x)
         grads .= back(one(loss))[1]
-        logger.gcalls += 1
+
+        push!(fval, loss)
+
+        if loss <= sqrt(eps(T))
+            break
+        end
 
         #iterate
         step!(opt, x, f, grads, Hop)
 
-        logger.hcalls += Hop.nProd
-
         update!(Hop, x)
     end
 
-    return logger
+    return fval
 end
 
 #=
@@ -89,7 +102,7 @@ Input:
 =#
 function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
-    λ = (opt.M*norm(grads))^opt.p + opt.ϵ
+    λ = (2*opt.M*norm(grads))^opt.p + opt.ϵ
 
     #compute shifts
     shifts = opt.quad_nodes .+ λ
@@ -98,8 +111,8 @@ function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where
     cg_lanczos_shift!(opt.krylov_solver, Hop, grads, shifts)
 
     #evaluate quadrature and update
-    @simd for i = 1:size(shifts, 1)
-        @inbounds x .-= opt.quad_weights[i].*opt.krylov_solver.x[i]
+    @inbounds for i = 1:size(shifts, 1)
+        x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
     end
 
     return nothing

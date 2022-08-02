@@ -68,9 +68,7 @@ function Flux.Optimise.train!(opt::StochasticRSFN, ps::T, f::F, trainLoader::L) 
         grads .= back(one(loss))[1]
 
         #make an update step
-        @time step!(opt.optimizer, ps, θ -> f(θ, X, Y), grads, Hop)
-
-        opt.log.hvps += Hop.nProd
+        step!(opt.optimizer, ps, θ -> f(θ, X, Y), grads, Hop)
     end
 
     return nothing
