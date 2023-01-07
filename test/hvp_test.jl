@@ -5,6 +5,7 @@ Tests for functionality found in src/hvp.jl -- helpful functionality.
 =#
 
 import LinearAlgebra as LA
+import Enzyme, ForwardDiff, ReverseDiff, Zygote
 
 if run_all || "hvp" in ARGS
     @testset "hvp" begin
@@ -24,33 +25,47 @@ if run_all || "hvp" in ARGS
         Test basic hvp function
         =#
         @testset "basic hvp" begin
-            @test RSFN._hvp(f, x, v) ≈ single
-            @test RSFN._hvp_zygote(f, x, v) ≈ single
+            @test RSFN.ehvp(f, x, v) ≈ single
+            @test RSFN.zhvp(f, x, v) ≈ single
+            @test RSFN.rhvp(f, x, v) ≈ single
         end
 
         #=
         Test hvp operator
         =#
         @testset "hvp operator" begin
-            Hop = RSFN.HvpOperator(f, x)
+
             result = similar(v)
-            LA.mul!(result, Hop, v)
 
-            @test eltype(Hop) == eltype(x)
-            @test size(Hop) == (n, n)
-            @test result ≈ double
-            @test Hop.nProd == 2
+            @testset "enzyme" begin
+                Hop = RSFN.EHvpOperator(f, x)
+                LA.mul!(result, Hop, v)
 
-            #TODO: Test hessian matrix multiplication, can Dual even handle that?
+                @test eltype(Hop) == eltype(x)
+                @test size(Hop) == (n, n)
+                @test result ≈ double
+                @test Hop.nProd == 2
+            end
 
-            Hop = RSFN.ZHvpOperator(f, x)
-            result = similar(v)
-            LA.mul!(result, Hop, v)
+            @testset "reversediff" begin
+                Hop = RSFN.RHvpOperator(f, x)
+                LA.mul!(result, Hop, v)
 
-            @test eltype(Hop) == eltype(x)
-            @test size(Hop) == (n, n)
-            @test result ≈ double
-            @test Hop.nProd == 2
+                @test eltype(Hop) == eltype(x)
+                @test size(Hop) == (n, n)
+                @test result ≈ double
+                @test Hop.nProd == 2
+            end
+
+            @testset "zygote" begin
+                Hop = RSFN.ZHvpOperator(f, x)
+                LA.mul!(result, Hop, v)
+
+                @test eltype(Hop) == eltype(x)
+                @test size(Hop) == (n, n)
+                @test result ≈ double
+                @test Hop.nProd == 2
+            end
         end
     end
 end

@@ -1,21 +1,21 @@
 #=
 Author: Cooper Simpson
 
-Associated functionality for matrix free Hessian vector multiplication operator.
+ForwardDiff over Zygote AD, compatible with Flux.
 =#
 
 using Zygote: pullback
 using ForwardDiff: partials, Dual
 
 #=
-Fast hessian vector product (hvp) function using forward-over-back AD
+Fast hessian vector product (hvp) function.
 
 Input:
 	f :: scalar valued function
 	x :: input to f
 	v :: vector
 =#
-function _zhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function zhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	val, back = pullback(f, Dual.(x,v))
 
 	return partials.(back(one(val))[1], 1)
@@ -32,7 +32,7 @@ mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOpe
 end
 
 #=
-Base implementations for HvpOperator
+Base implementations for ZHvpOperator
 =#
 Base.eltype(Hop::ZHvpOperator{F, T, S}) where {F, T, S} = T
 Base.size(Hop::ZHvpOperator) = (size(Hop.x,1), size(Hop.x,1))
@@ -51,7 +51,7 @@ function ZHvpOperator(f::F, x::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 end
 
 #=
-Inplace matrix vector multiplcation with HvpOperator.
+Inplace matrix vector multiplcation with ZHvpOperator.
 
 Input:
 	result :: matvec storage
@@ -65,21 +65,6 @@ function apply!(result::S, Hop::ZHvpOperator, v::S) where S<:AbstractVector{<:Ab
 	val, back = pullback(Hop.f, Hop.dualCache1)
 
 	result .= partials.(back(one(val))[1], 1)
-
-	return nothing
-end
-
-#=
-Inplace matrix vector multiplcation with squared HvpOperator
-
-Input:
-	result :: matvec storage
-	Hop :: HvpOperator
-	v :: rhs vector
-=#
-function LinearAlgebra.mul!(result::S, Hop::ZHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	apply!(result, Hop, v)
-	apply!(result, Hop, result)
 
 	return nothing
 end

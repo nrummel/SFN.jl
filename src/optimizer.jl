@@ -65,19 +65,19 @@ Input:
     itmax :: maximum iterations
 =#
 function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
-    fval = []
+    fvec = []
 
     grads = similar(x)
     Hop = RHvpOperator(f, x)
 
     for i = 1:itmax
         #construct gradient and hvp operator
-        loss, back = pullback(f, x)
-        grads .= back(one(loss))[1]
+        fval, back = pullback(f, x)
+        grads .= back(one(fval))[1]
 
-        push!(fval, loss)
+        push!(fvec, fval)
 
-        if loss <= sqrt(eps(T))
+        if fval <= sqrt(eps(T))
             break
         end
 
@@ -87,7 +87,44 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:Ab
         update!(Hop, x)
     end
 
-    return fval
+    return fvec
+end
+
+#=
+Repeatedly applies the R-SFN iteration to minimize the function.
+
+Input:
+    opt :: RSFNOptimizer
+    x :: initialization
+    f :: scalar valued function
+    g! :: inplace gradient function of f
+    H! :: hvp generator
+    itmax :: maximum iterations
+=#
+function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+    fvec = []
+
+    grads = similar(x)
+    Hop = LHvpOperator(x, H!)
+
+    for i = 1:itmax
+        #compute loss, gradient, and Hop
+        fval = f(x)
+        g!(x, grads)
+
+        push!(fvec, fval)
+
+        if fval <= sqrt(eps(T))
+            break
+        end
+
+        #iterate
+        step!(opt, x, f, grads, Hop)
+
+        update!(Hop, x)
+    end
+
+    return fvec
 end
 
 #=

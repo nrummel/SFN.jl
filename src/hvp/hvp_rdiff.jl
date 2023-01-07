@@ -1,22 +1,21 @@
 #=
 Author: Cooper Simpson
 
-Associated functionality for matrix free Hessian vector multiplication operator
-using ForwardDiff over ReverseDiff mixed mode AD.
+ForwardDiff over ReverseDiff AD.
 =#
 
 using ReverseDiff: AbstractTape, GradientTape, compile, gradient!, gradient
 using ForwardDiff: Partials, partials, Dual, Tag
 
 #=
-Fast hessian vector product (hvp) function using ForwardDiff over ReverseDiff
+Fast hessian vector product (hvp) function.
 
 Input:
 	f :: scalar valued function
 	x :: input to f
 	v :: vector
 =#
-function _rhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function rhvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
 	dual = Dual.(x,v)
 
 	return partials.(gradient(f, dual), 1)
@@ -85,21 +84,6 @@ function apply!(result::S, Hop::RHvpOperator, v::S) where S<:AbstractVector{<:Ab
 	gradient!(Hop.dualCache2, Hop.tape, Hop.dualCache1)
 
 	result .= partials.(Hop.dualCache2, 1)
-
-	return nothing
-end
-
-#=
-Inplace matrix vector multiplcation with squared RHvpOperator
-
-Input:
-	result :: matvec storage
-	Hop :: RHvpOperator
-	v :: rhs vector
-=#
-function LinearAlgebra.mul!(result::S, Hop::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	apply!(result, Hop, v)
-	apply!(result, Hop, result)
 
 	return nothing
 end
