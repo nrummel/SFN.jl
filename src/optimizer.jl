@@ -6,6 +6,7 @@ R-SFN optimizer.
 
 using FastGaussQuadrature: gausslaguerre
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
+using Zygote: pullback
 
 #=
 R-SFN optimizer struct.
