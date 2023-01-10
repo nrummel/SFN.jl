@@ -3,17 +3,11 @@
 [Cooper Simpson](https://rs-coop.github.io/)
 
 A Julia implementation of the R-SFN algorithm: a second-order method for unconstrained non-convex optimization. To that end, we consider a problem of the following form
-$$
-	\min_{\mathbf{x}\in \mathbb{R}^n}f(\mathbf{x})
-$$
+$$\min_{\mathbf{x}\in \mathbb{R}^n}f(\mathbf{x})$$
 where $f:\mathbb{R}^n\to\mathbb{R}$ is a twice continuously differentiable function. Each iteration applies an update of the following form:
-$$
-	\mathbf{x}^{(k+1)} = \mathbf{x}^{(k)}-\alpha\Big(\big(\nabla^2f(\mathbf{x}^{(k)})\big)^2+\lambda^{(k)}\mathbf{I}\Big)^{-1/2} \nabla f(\mathbf{x}^{(k)})
-$$
+$$\mathbf{x}^{(k+1)} = \mathbf{x}^{(k)}-\alpha\Big(\big(\nabla^2f(\mathbf{x}^{(k)})\big)^2+\lambda^{(k)}\mathbf{I}\Big)^{-1/2} \nabla f(\mathbf{x}^{(k)})$$
 where the regularization term is $\lambda^{(k)}\propto\|\nabla^2f(\mathbf{x}^{(k)})\|$. The matrix inverse square root is computed via a quadrature approximation of the following identity:
-$$
-	\mathbf{A}^{-1/2}=\frac{2}{\pi}\int_{0}^{\infty}\big(t^2\mathbf{I}+\mathbf{A}\big)^{-1}\ dt
-$$
+$$\mathbf{A}^{-1/2}=\frac{2}{\pi}\int_{0}^{\infty}\big(t^2\mathbf{I}+\mathbf{A}\big)^{-1}\ dt$$
 where $\mathbf{A}\in\mathbb{R}^{n\times n}$ is a matrix with strictly positive spectrum, i.e $\sigma(\mathbf{A})\subset\mathbb{R}_{+ +}$.
 
 ## License & Citation
