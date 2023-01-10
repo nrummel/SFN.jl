@@ -48,13 +48,12 @@ Let's look at a two dimensional Rosenbrock example:
 ```julia
 function rosenbrock(x)
 
-res = 0.0
+	res = 0.0
+	for i = 1:size(x,1)-1
+		res += 100*(x[i+1]-x[i]^2)^2 + (1-x[i])^2
+	end
 
-for i = 1:size(x,1)-1
-	res += 100*(x[i+1]-x[i]^2)^2 + (1-x[i])^2
-end
-
-return res
+	return res
 
 end
 
