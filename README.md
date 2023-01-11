@@ -67,7 +67,7 @@ minimize!(opt, x, rosenbrock, itmax=10)
 ## Publications
 
 ### [Regularized Saddle-Free Newton: Saddle Avoidance and Efficient Implementation](https://rs-coop.github.io/projects/research/rsfn)
-```
+```bibtex
 @mastersthesis{rsfn,
 	title = {{Regularized Saddle-Free Newton: Saddle Avoidance and Efficient Implementation}},
 	author = {Cooper Simpson},
