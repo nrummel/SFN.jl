@@ -1,6 +1,7 @@
 @misc{rsfn-julia,
   author = {Simpson, Cooper},
-  title = {{RSFN.jl: A Julia Implementation of Regularized Saddle-Free Newton}},
-  howpublished = {https://github.com/RS-Coop/R-SFN},
+  title = {RSFN.jl},
+  howpublished = {\url{github.com/RS-Coop/R-SFN}},
+  note = {A Julia Implementation of Regularized Saddle-Free Newton}
   year = {2022}
 }
