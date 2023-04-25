@@ -34,8 +34,8 @@ end
 #=
 Base implementations for ZHvpOperator
 =#
-Base.eltype(Hop::ZHvpOperator{F, T, S}) where {F, T, S} = T
-Base.size(Hop::ZHvpOperator) = (size(Hop.x,1), size(Hop.x,1))
+Base.eltype(Hv::ZHvpOperator{F, T, S}) where {F, T, S} = T
+Base.size(Hv::ZHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
 Constructor.
@@ -55,14 +55,14 @@ Inplace matrix vector multiplcation with ZHvpOperator.
 
 Input:
 	result :: matvec storage
-	Hop :: HvpOperator
+	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hop::ZHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	Hop.nProd += 1
+function apply!(result::S, Hv::ZHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+	Hv.nProd += 1
 
-	Hop.dualCache1 .= Dual.(Hop.x, v)
-	val, back = pullback(Hop.f, Hop.dualCache1)
+	Hv.dualCache1 .= Dual.(Hv.x, v)
+	val, back = pullback(Hv.f, Hv.dualCache1)
 
 	result .= partials.(back(one(val))[1], 1)
 

@@ -38,33 +38,33 @@ if run_all || "hvp" in ARGS
             result = similar(v)
 
             @testset "enzyme" begin
-                Hop = RSFN.EHvpOperator(f, x)
-                LA.mul!(result, Hop, v)
+                Hv = RSFN.EHvpOperator(f, x)
+                LA.mul!(result, Hv, v)
 
-                @test eltype(Hop) == eltype(x)
-                @test size(Hop) == (n, n)
+                @test eltype(Hv) == eltype(x)
+                @test size(Hv) == (n, n)
                 @test result ≈ double
-                @test Hop.nProd == 2
+                @test Hv.nProd == 2
             end
 
             @testset "reversediff" begin
-                Hop = RSFN.RHvpOperator(f, x)
-                LA.mul!(result, Hop, v)
+                Hv = RSFN.RHvpOperator(f, x)
+                LA.mul!(result, Hv, v)
 
-                @test eltype(Hop) == eltype(x)
-                @test size(Hop) == (n, n)
+                @test eltype(Hv) == eltype(x)
+                @test size(Hv) == (n, n)
                 @test result ≈ double
-                @test Hop.nProd == 2
+                @test Hv.nProd == 2
             end
 
             @testset "zygote" begin
-                Hop = RSFN.ZHvpOperator(f, x)
-                LA.mul!(result, Hop, v)
+                Hv = RSFN.ZHvpOperator(f, x)
+                LA.mul!(result, Hv, v)
 
-                @test eltype(Hop) == eltype(x)
-                @test size(Hop) == (n, n)
+                @test eltype(Hv) == eltype(x)
+                @test size(Hv) == (n, n)
                 @test result ≈ double
-                @test Hop.nProd == 2
+                @test Hv.nProd == 2
             end
         end
     end

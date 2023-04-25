@@ -35,17 +35,17 @@ end
 #=
 Base implementations for RHvpOperator
 =#
-Base.eltype(Hop::RHvpOperator{F, R, S, T}) where {F, R, S, T} = R
-Base.size(Hop::RHvpOperator) = (size(Hop.x,1), size(Hop.x,1))
+Base.eltype(Hv::RHvpOperator{F, R, S, T}) where {F, R, S, T} = R
+Base.size(Hv::RHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
 In place update of RHvpOperator
 Input:
 	x :: new input to f
 =#
-function update!(Hop::RHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
-	Hop.x .= x
-	Hop.nProd = 0
+function update!(Hv::RHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
+	Hv.x .= x
+	Hv.nProd = 0
 
 	return nothing
 end
@@ -73,17 +73,17 @@ Inplace matrix vector multiplcation with RHvpOperator.
 
 Input:
 	result :: matvec storage
-	Hop :: RHvpOperator
+	Hv :: RHvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hop::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	Hop.nProd += 1
+function apply!(result::S, Hv::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+	Hv.nProd += 1
 
-	Hop.dualCache1 .= Dual{typeof(Tag(Nothing, eltype(v))),eltype(v),1}.(Hop.x, Partials.(Tuple.(v)))
+	Hv.dualCache1 .= Dual{typeof(Tag(Nothing, eltype(v))),eltype(v),1}.(Hv.x, Partials.(Tuple.(v)))
 
-	gradient!(Hop.dualCache2, Hop.tape, Hop.dualCache1)
+	gradient!(Hv.dualCache2, Hv.tape, Hv.dualCache1)
 
-	result .= partials.(Hop.dualCache2, 1)
+	result .= partials.(Hv.dualCache2, 1)
 
 	return nothing
 end

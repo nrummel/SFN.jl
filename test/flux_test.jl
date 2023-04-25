@@ -24,9 +24,9 @@ if run_all || "flux" in ARGS
             params, re = Flux.destructure(model)
             f(w) = re(w)(dataBatch)
 
-            Hop = CubicNewton.HvpOperator(f, params)
+            Hv = CubicNewton.HvpOperator(f, params)
             result = similar(v)
-            LinearAlgebra.mul!(result, Hop, v)
+            LinearAlgebra.mul!(result, Hv, v)
 
             @test result ≈ Flux.hessian(w -> sum(f(w)), params)*v
 

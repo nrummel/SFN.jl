@@ -60,15 +60,15 @@ function Flux.Optimise.train!(opt::StochasticRSFN, ps::T, f::F, trainLoader::L) 
         subX = X[Tuple([Colon() for i in 1:ndims(X)-1])..., idx]
         subY = Y[:, idx]
 
-        # update!(opt.Hop, θ -> f(θ, subX, subY), ps)
-        Hop = HvpOperator(θ -> f(θ, subX, subY), ps)
+        # update!(opt.Hv, θ -> f(θ, subX, subY), ps)
+        Hv = HvpOperator(θ -> f(θ, subX, subY), ps)
 
         #compute gradients
         loss, back = pullback(θ -> f(θ, X, Y), ps)
         grads .= back(one(loss))[1]
 
         #make an update step
-        step!(opt.optimizer, ps, θ -> f(θ, X, Y), grads, Hop)
+        step!(opt.optimizer, ps, θ -> f(θ, X, Y), grads, Hv)
     end
 
     return nothing

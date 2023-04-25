@@ -12,12 +12,12 @@ Inplace matrix vector multiplcation with squared HvpOperator
 
 Input:
 	result :: matvec storage
-	Hop :: HvpOperator
+	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::S, Hop::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	apply!(result, Hop, v)
-	apply!(result, Hop, result)
+function LinearAlgebra.mul!(result::S, Hv::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+	apply!(result, Hv, v)
+	apply!(result, Hv, result)
 
 	return nothing
 end

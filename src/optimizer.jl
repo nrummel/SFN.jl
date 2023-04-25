@@ -69,7 +69,7 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:Ab
     fvec = []
 
     grads = similar(x)
-    Hop = RHvpOperator(f, x)
+    Hv = RHvpOperator(f, x)
 
     for i = 1:itmax
         #construct gradient and hvp operator
@@ -83,9 +83,9 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:Ab
         end
 
         #iterate
-        step!(opt, x, f, grads, Hop)
+        step!(opt, x, f, grads, Hv)
 
-        update!(Hop, x)
+        update!(Hv, x)
     end
 
     return fvec
@@ -106,10 +106,10 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=10
     fvec = []
 
     grads = similar(x)
-    Hop = LHvpOperator(x, H!)
+    Hv = LHvpOperator(x, H!)
 
     for i = 1:itmax
-        #compute loss, gradient, and Hop
+        #compute loss, gradient, and update Hv
         fval = f(x)
         g!(x, grads)
 
@@ -120,9 +120,9 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=10
         end
 
         #iterate
-        step!(opt, x, f, grads, Hop)
+        step!(opt, x, f, grads, Hv)
 
-        update!(Hop, x)
+        update!(Hv, x)
     end
 
     return fvec
@@ -138,7 +138,7 @@ Input:
     grads :: function gradients
     hess :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, F}
+function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
     λ = (2*opt.M*norm(grads))^opt.p + opt.ϵ
 
@@ -146,7 +146,7 @@ function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hop::HvpOperator) where
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hop, grads, shifts)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts)
 
     #evaluate quadrature and update
     @inbounds for i = 1:size(shifts, 1)
