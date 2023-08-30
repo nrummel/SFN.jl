@@ -3,8 +3,14 @@ Author: Cooper Simpson
 
 All functionality to interact with Flux.jl and support R-SFN optimizer
 =#
+
+module FluxExt
+
+using RSFN: RSFNOptimizer, HvpOperator
 using .Flux
 using Zygote: pullback
+
+export StochasticRSFN
 
 #=
 Optimizer for stochastic R-SFN.
@@ -104,3 +110,5 @@ function make_flat(model::M, dim::Int, type::Type{AbstractVector{T}}) where {T<:
     #return flattened parameters and new model
     return flat, out
 end
+
+end #module

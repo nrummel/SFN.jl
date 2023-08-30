@@ -4,8 +4,11 @@ Author: Cooper Simpson
 ForwardDiff over ReverseDiff AD.
 =#
 
+using RSFN: HvpOperator
 using ReverseDiff: AbstractTape, GradientTape, compile, gradient!, gradient
 using ForwardDiff: Partials, partials, Dual, Tag
+
+export rhvp, RHvpOperator
 
 #=
 Fast hessian vector product (hvp) function.

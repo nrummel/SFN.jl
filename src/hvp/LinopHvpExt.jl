@@ -4,8 +4,14 @@ Author: Cooper Simpson
 Wrapper around LinearOperator.jl based Hessian-vector product, no AD.
 =#
 
+using RSFN: HvpOperator
 using LinearOperators: LinearOperator
 
+export LHvpOperator
+
+#=
+
+=#
 mutable struct LHvpOperator{R<:AbstractFloat, S<:AbstractVector{R}, F} <: HvpOperator
     x::S
     build::F

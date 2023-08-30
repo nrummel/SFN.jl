@@ -11,10 +11,9 @@ using Zygote: pullback
 #=
 R-SFN optimizer struct.
 =#
-mutable struct RSFNOptimizer{T1,T2<:Real, T3<:AbstractFloat, S<:AbstractVector{T3}}
+mutable struct RSFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
     M::T1 #hessian lipschitz constant
-    p::T2 #regularization power
-    ϵ::T3#regularization minimum
+    ϵ::T2#regularization minimum
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
@@ -29,11 +28,10 @@ Input:
     dim :: dimension of parameters
     type :: parameter type
     M :: hessian lipschitz constant
-    p :: regularization power
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64}; M::T1=1, p::T2=1, ϵ::T3=eps(Float64), quad_order::Int=20) where {T1,T2<:Real, T3<:AbstractFloat}
+function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::Int=20) where {T1<:Real, T2<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
@@ -53,7 +51,7 @@ function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T3}}=Vector{Float64
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
-    return RSFNOptimizer(M, p, ϵ, nodes, weights, solver)
+    return RSFNOptimizer(M, ϵ, nodes, weights, solver)
 end
 
 #=
@@ -64,8 +62,9 @@ Input:
     x :: initialization
     f :: scalar valued function
     itmax :: maximum iterations
+    linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
     fvec = []
 
     grads = similar(x)
@@ -83,7 +82,7 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000) where {T<:Ab
         end
 
         #iterate
-        step!(opt, x, f, grads, Hv)
+        step!(opt, x, f, grads, Hv, linesearch)
 
         update!(Hv, x)
     end
@@ -101,8 +100,9 @@ Input:
     g! :: inplace gradient function of f
     H! :: hvp generator
     itmax :: maximum iterations
+    linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000, linsearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
     fvec = []
 
     grads = similar(x)
@@ -120,7 +120,7 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=10
         end
 
         #iterate
-        step!(opt, x, f, grads, Hv)
+        step!(opt, x, f, grads, Hv, linesearch)
 
         update!(Hv, x)
     end
@@ -136,21 +136,32 @@ Input:
     x :: current iterate
     f :: scalar valued function
     grads :: function gradients
-    hess :: hessian operator
+    Hv :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator) where {S<:AbstractVector{<:AbstractFloat}, F}
+function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=False) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
-    λ = (2*opt.M*norm(grads))^opt.p + opt.ϵ
+    g_norm = norm(grads)
+    λ = opt.M*g_norm + opt.ϵ
 
     #compute shifts
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, g, shifts)
 
-    #evaluate quadrature and update
-    @inbounds for i = 1:size(shifts, 1)
-        x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+    #evaluate integral and update
+    if linesearch
+        p = similar(x)
+
+        @inbounds for i = 1:size(shifts, 1)
+            p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        end
+
+        x .= search!(p, x, f, g_norm)
+    else
+        @inbounds for i = 1:size(shifts, 1)
+            x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        end
     end
 
     return nothing

@@ -5,7 +5,6 @@ Tests for functionality found in src/hvp.jl -- helpful functionality.
 =#
 
 import LinearAlgebra as LA
-import Enzyme, ForwardDiff, ReverseDiff, Zygote
 
 if run_all || "hvp" in ARGS
     @testset "hvp" begin
@@ -25,9 +24,9 @@ if run_all || "hvp" in ARGS
         Test basic hvp function
         =#
         @testset "basic hvp" begin
-            @test RSFN.ehvp(f, x, v) ≈ single
-            @test RSFN.zhvp(f, x, v) ≈ single
-            @test RSFN.rhvp(f, x, v) ≈ single
+            @test ehvp(f, x, v) ≈ single
+            @test zhvp(f, x, v) ≈ single
+            @test rhvp(f, x, v) ≈ single
         end
 
         #=
@@ -38,7 +37,7 @@ if run_all || "hvp" in ARGS
             result = similar(v)
 
             @testset "enzyme" begin
-                Hv = RSFN.EHvpOperator(f, x)
+                Hv = EHvpOperator(f, x)
                 LA.mul!(result, Hv, v)
 
                 @test eltype(Hv) == eltype(x)
@@ -48,7 +47,7 @@ if run_all || "hvp" in ARGS
             end
 
             @testset "reversediff" begin
-                Hv = RSFN.RHvpOperator(f, x)
+                Hv = RHvpOperator(f, x)
                 LA.mul!(result, Hv, v)
 
                 @test eltype(Hv) == eltype(x)
@@ -58,7 +57,7 @@ if run_all || "hvp" in ARGS
             end
 
             @testset "zygote" begin
-                Hv = RSFN.ZHvpOperator(f, x)
+                Hv = ZHvpOperator(f, x)
                 LA.mul!(result, Hv, v)
 
                 @test eltype(Hv) == eltype(x)

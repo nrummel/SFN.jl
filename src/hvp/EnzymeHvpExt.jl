@@ -4,7 +4,10 @@ Author: Cooper Simpson
 Enzyme AD.
 =#
 
+using RSFN: HvpOperator
 using Enzyme: autodiff, autodiff_deferred, Forward, Duplicated
+
+export ehvp, EHvpOperator
 
 #=
 Fast hessian vector product (hvp) function.
@@ -40,17 +43,17 @@ end
 #=
 Base implementations for EHvpOperator
 =#
-Base.eltype(Hop::EHvpOperator{F, R, S}) where {F, R, S} = R
-Base.size(Hop::EHvpOperator) = (size(Hop.duplicated.val, 1), size(Hop.duplicated.val, 1))
+Base.eltype(Hv::EHvpOperator{F, R, S}) where {F, R, S} = R
+Base.size(Hv::EHvpOperator) = (size(Hv.duplicated.val, 1), size(Hv.duplicated.val, 1))
 
 #=
 In place update of EHvpOperator
 Input:
 	x :: new input to f
 =#
-function update!(Hop::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
-	Hop.duplicated = Duplicated(x, similar(x))
-	Hop.nProd = 0
+function update!(Hv::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
+	Hv.duplicated = Duplicated(x, similar(x))
+	Hv.nProd = 0
 
 	return nothing
 end
@@ -73,16 +76,16 @@ Inplace matrix vector multiplcation with EHvpOperator.
 
 Input:
 	result :: matvec storage
-	Hop :: EHvpOperator
+	Hv :: EHvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hop::EHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	Hop.nProd += 1
+function apply!(result::S, Hv::EHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+	Hv.nProd += 1
 
     autodiff(
         Forward,
-        Hop.gf,
-        Duplicated(Hop.duplicated, Duplicated(v, result))
+        Hv.gf,
+        Duplicated(Hv.duplicated, Duplicated(v, result))
     )
 
 	return nothing

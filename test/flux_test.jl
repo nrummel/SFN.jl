@@ -6,7 +6,6 @@ the Flux.jl package.
 =#
 
 using Flux
-using Zygote
 
 if run_all || "flux" in ARGS
     @testset "flux" begin

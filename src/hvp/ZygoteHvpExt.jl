@@ -4,8 +4,11 @@ Author: Cooper Simpson
 ForwardDiff over Zygote AD, compatible with Flux.
 =#
 
+using RSFN: HvpOperator
 using Zygote: pullback
 using ForwardDiff: partials, Dual
+
+export zhvp, ZHvpOperator
 
 #=
 Fast hessian vector product (hvp) function.

@@ -7,6 +7,11 @@ using mixed mode AD.
 
 abstract type HvpOperator end
 
+include("hvp/EnzymeHvpExt.jl")
+include("hvp/LinopHvpExt.jl")
+include("hvp/RdiffHvpExt.jl")
+include("hvp/ZygoteHvpExt.jl")
+
 #=
 Inplace matrix vector multiplcation with squared HvpOperator
 
