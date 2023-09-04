@@ -5,7 +5,7 @@ Enzyme AD.
 =#
 
 using RSFN: HvpOperator
-using Enzyme: autodiff, autodiff_deferred, Forward, Duplicated
+using Enzyme: autodiff, autodiff_deferred, Forward, Reverse, Duplicated
 
 export ehvp, EHvpOperator
 
@@ -17,15 +17,21 @@ Input:
 	x :: input to f
 	v :: vector
 =#
-function ehvp(f::F, x::S, v::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function ehvp(f::F, x::S, v::S) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
 
     bx = similar(x)
     dbx = similar(x)
 
+    y = zero(T)
+    dy = zero(T)
+    by = one(T)
+    dby = zero(T)
+
     autodiff(
         Forward,
-        x -> autodiff_deferred(f, x),
-        Duplicated(Duplicated(x, bx), Duplicated(v, dbx))
+        (x,y) -> autodiff_deferred(Reverse, f, x, y),
+        Duplicated(Duplicated(x, bx), Duplicated(v, dbx)),
+        Duplicated(Duplicated(y, by), Duplicated(dy, dby))
     )
 
     return dbx
