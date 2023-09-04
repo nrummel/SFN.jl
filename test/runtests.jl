@@ -1,10 +1,10 @@
 #=
 Author: Cooper Simpson
 
-RSFN tests, specific tests runnable with Pkg.test(test_args=["target"])
+SFN tests, specific tests runnable with Pkg.test(test_args=["target"])
 =#
 using Test
-using RSFN
+using SFN
 
 if isempty(ARGS) || "all" in ARGS
     run_all = true

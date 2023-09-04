@@ -1,22 +1,22 @@
 #=
 Author: Cooper Simpson
 
-All functionality to interact with Flux.jl and support R-SFN optimizer
+All functionality to interact with Flux.jl and support SFN optimizer
 =#
 
 module FluxExt
 
-using RSFN: RSFNOptimizer, HvpOperator
+using SFN: SFNOptimizer, HvpOperator
 using .Flux
 using Zygote: pullback
 
-export StochasticRSFN
+export StochasticSFN
 
 #=
-Optimizer for stochastic R-SFN.
+Optimizer for stochastic SFN.
 =#
-mutable struct StochasticRSFN{T<:AbstractFloat}
-    optimizer::RSFNOptimizer{T}
+mutable struct StochasticSFN{T<:AbstractFloat}
+    optimizer::SFNOptimizer{T}
     sub_sample::T
 end
 
@@ -32,11 +32,11 @@ function StochasticCubicNewton(dim::Int, sub_sample::T=0.1) where T<:AbstractFlo
         throw(ArgumentError("Hessian sample factor not in range (0,1]."))
     end
 
-    return StochasticrRSFN(RSFNOptimizer(dim), sub_sample)
+    return StochasticSFN(SFNOptimizer(dim), sub_sample)
 end
 
 #=
-Custom Flux training function for a StochasticRSFN optimizer
+Custom Flux training function for a StochasticSFN optimizer
 
 Input:
     opt :: cubic newton optimizer
@@ -44,7 +44,7 @@ Input:
     f :: model + loss function
     trainLoader :: training data
 =#
-function Flux.Optimise.train!(opt::StochasticRSFN, ps::T, f::F, trainLoader::L) where {T<:AbstractVector, F, L}
+function Flux.Optimise.train!(opt::StochasticSFN, ps::T, f::F, trainLoader::L) where {T<:AbstractVector, F, L}
     grads = similar(ps)
 
     #TODO: allocate spsace for subsamples only once

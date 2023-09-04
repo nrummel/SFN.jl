@@ -1,7 +1,7 @@
 #=
 Author: Cooper Simpson
 
-R-SFN optimizer.
+SFN optimizer.
 =#
 
 using FastGaussQuadrature: gausslaguerre
@@ -9,9 +9,9 @@ using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
 using Zygote: pullback
 
 #=
-R-SFN optimizer struct.
+SFN optimizer struct.
 =#
-mutable struct RSFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
+mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
     M::T1 #hessian lipschitz constant
     ϵ::T2#regularization minimum
     quad_nodes::S #quadrature nodes
@@ -31,7 +31,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::Int=20) where {T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::Int=20) where {T1<:Real, T2<:AbstractFloat}
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
@@ -51,20 +51,20 @@ function RSFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
-    return RSFNOptimizer(M, ϵ, nodes, weights, solver)
+    return SFNOptimizer(M, ϵ, nodes, weights, solver)
 end
 
 #=
-Repeatedly applies the R-SFN iteration to minimize the function.
+Repeatedly applies the SFN iteration to minimize the function.
 
 Input:
-    opt :: RSFNOptimizer
+    opt :: SFNOptimizer
     x :: initialization
     f :: scalar valued function
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
     fvec = []
 
     grads = similar(x)
@@ -91,10 +91,10 @@ function minimize!(opt::RSFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::
 end
 
 #=
-Repeatedly applies the R-SFN iteration to minimize the function.
+Repeatedly applies the SFN iteration to minimize the function.
 
 Input:
-    opt :: RSFNOptimizer
+    opt :: SFNOptimizer
     x :: initialization
     f :: scalar valued function
     g! :: inplace gradient function of f
@@ -102,7 +102,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::RSFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000, linsearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000, linsearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
     fvec = []
 
     grads = similar(x)
@@ -132,13 +132,13 @@ end
 Computes an update step according to the shifted Lanczos-CG update rule.
 
 Input:
-    opt :: RSFNOptimizer
+    opt :: SFNOptimizer
     x :: current iterate
     f :: scalar valued function
     grads :: function gradients
     Hv :: hessian operator
 =#
-function step!(opt::RSFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=False) where {S<:AbstractVector{<:AbstractFloat}, F}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=False) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
     g_norm = norm(grads)
     λ = opt.M*g_norm + opt.ϵ

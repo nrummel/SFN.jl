@@ -4,7 +4,7 @@ Author: Cooper Simpson
 ForwardDiff over Zygote AD, compatible with Flux.
 =#
 
-using RSFN: HvpOperator
+using SFN: HvpOperator
 using Zygote: pullback
 using ForwardDiff: partials, Dual
 

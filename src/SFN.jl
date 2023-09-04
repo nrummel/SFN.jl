@@ -3,14 +3,14 @@ Author: Cooper Simpson
 
 CubicNewton optimization package.
 =#
-module RSFN
+module SFN
 
 #=
 Setup
 =#
 using LinearAlgebra
 
-export RSFNOptimizer, minimize!
+export SFNOptimizer, minimize!
 
 include("hvp.jl")
 include("linesearch.jl")

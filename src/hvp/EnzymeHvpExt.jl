@@ -4,7 +4,7 @@ Author: Cooper Simpson
 Enzyme AD.
 =#
 
-using RSFN: HvpOperator
+using SFN: HvpOperator
 using Enzyme: autodiff, autodiff_deferred, Forward, Reverse, Duplicated
 
 export ehvp, EHvpOperator

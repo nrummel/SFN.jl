@@ -1,7 +1,7 @@
 #=
 Author: Cooper Simpson
 
-R-SFN backtracking line-search procedures.
+SFN backtracking line-search procedures.
 =#
 
 #=

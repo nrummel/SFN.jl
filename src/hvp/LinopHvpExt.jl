@@ -4,7 +4,7 @@ Author: Cooper Simpson
 Wrapper around LinearOperator.jl based Hessian-vector product, no AD.
 =#
 
-using RSFN: HvpOperator
+using SFN: HvpOperator
 using LinearOperators: LinearOperator
 
 export LHvpOperator

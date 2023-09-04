@@ -1,7 +1,7 @@
 #=
 Author: Cooper Simpson
 
-Tests for functionality found in src/optimizer.jl -- the RSFN optimizer.
+Tests for functionality found in src/optimizer.jl -- the SFN optimizer.
 =#
 
 if run_all || "optimizer" in ARGS
@@ -16,12 +16,12 @@ if run_all || "optimizer" in ARGS
         end
 
         #=
-        Test R-SFN optimizer
+        Test SFN optimizer
         =#
-        @testset "R-SFN optimizer" begin
+        @testset "SFN optimizer" begin
             x = [0.0, 3.0]
 
-            opt = RSFNOptimizer(size(x,1))
+            opt = SFNOptimizer(size(x,1))
 
             @test_nowarn minimize!(opt, x, rosenbrock, itmax=5)
         end

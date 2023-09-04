@@ -4,7 +4,7 @@ Author: Cooper Simpson
 ForwardDiff over ReverseDiff AD.
 =#
 
-using RSFN: HvpOperator
+using SFN: HvpOperator
 using ReverseDiff: AbstractTape, GradientTape, compile, gradient!, gradient
 using ForwardDiff: Partials, partials, Dual, Tag
 
