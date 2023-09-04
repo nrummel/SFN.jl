@@ -40,16 +40,17 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct EHvpOperator{F, R<:AbstractFloat, S<:AbstractVector{R}} <: HvpOperator
+mutable struct EHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
     gf::F
     duplicated::Duplicated{S}
-	nProd::Int
+	nProd::Integer
+    power::Integer
 end
 
 #=
 Base implementations for EHvpOperator
 =#
-Base.eltype(Hv::EHvpOperator{F, R, S}) where {F, R, S} = R
+Base.eltype(Hv::EHvpOperator{F, T, S}) where {F, T, S} = T
 Base.size(Hv::EHvpOperator) = (size(Hv.duplicated.val, 1), size(Hv.duplicated.val, 1))
 
 #=
@@ -71,10 +72,10 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function EHvpOperator(f::F, x::S) where {F, S<:AbstractVector{<:AbstractFloat}}
+function EHvpOperator(f::F, x::S; power::Integer=2) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
     gf = x -> autodiff_deferred(f, x)
 
-	return EHvpOperator(gf, Duplicated(x, similar(x)), 0)
+	return EHvpOperator(gf, Duplicated(x, similar(x)), 0, power)
 end
 
 #=

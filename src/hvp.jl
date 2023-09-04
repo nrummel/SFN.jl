@@ -13,7 +13,9 @@ include("hvp/RdiffHvpExt.jl")
 include("hvp/ZygoteHvpExt.jl")
 
 #=
-Inplace matrix vector multiplcation with squared HvpOperator
+In-place matrix vector multiplcation with HvpOperator
+
+WARNING: Default construction for Hv is power=2
 
 Input:
 	result :: matvec storage
@@ -22,7 +24,10 @@ Input:
 =#
 function LinearAlgebra.mul!(result::S, Hv::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	apply!(result, Hv, v)
-	apply!(result, Hv, result)
+
+	for i=1:Hv.power-1
+		apply!(result, Hv, result)
+	end
 
 	return nothing
 end

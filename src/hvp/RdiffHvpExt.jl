@@ -27,18 +27,19 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct RHvpOperator{F, R<:AbstractFloat, S<:AbstractVector{R}, T<:AbstractTape} <: HvpOperator
+mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
 	x::S
-	dualCache1::Vector{Dual{F, R, 1}}
-	dualCache2::Vector{Dual{F, R, 1}}
-	tape::T
-	nProd::Int
+	dualCache1::Vector{Dual{F, T, 1}}
+	dualCache2::Vector{Dual{F, T, 1}}
+	tape::AbstractTape
+	nProd::Integer
+	power::Integer
 end
 
 #=
 Base implementations for RHvpOperator
 =#
-Base.eltype(Hv::RHvpOperator{F, R, S, T}) where {F, R, S, T} = R
+Base.eltype(Hv::RHvpOperator{F, T, S}) where {F, T, S} = T
 Base.size(Hv::RHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
@@ -60,7 +61,8 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function RHvpOperator(f::F, x::S, compile_tape=true) where {F, S<:AbstractVector{<:AbstractFloat}}
+function RHvpOperator(f::F, x::S; power::Integer=2, compile_tape=true) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+
 	dualCache1 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 	dualCache2 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 
@@ -68,7 +70,7 @@ function RHvpOperator(f::F, x::S, compile_tape=true) where {F, S<:AbstractVector
 
 	compile_tape ? tape = compile(tape) : tape
 
-	return RHvpOperator(x, dualCache1, dualCache2, tape, 0)
+	return RHvpOperator(x, dualCache1, dualCache2, tape, 0, power)
 end
 
 #=
