@@ -32,15 +32,16 @@ Input:
     quad_order :: number of quadrature nodes
 =#
 function SFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::Int=20) where {T1<:Real, T2<:AbstractFloat}
-    #krylov solver
-    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
-
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
     if size(nodes, 1) < quad_order
+        quad_order = size(nodes, 1)
         println("Quadrature weight precision reached, using $(size(nodes,1)) quadrature locations.")
     end
+
+    #krylov solver
+    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     #=
     NOTE: Performing some extra global operations here.
@@ -64,7 +65,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
     fvec = []
 
     grads = similar(x)
@@ -98,15 +99,15 @@ Input:
     x :: initialization
     f :: scalar valued function
     g! :: inplace gradient function of f
-    H! :: hvp generator
+    H :: hvp generator
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H!::L; itmax::Int=1000, linsearch::Bool=False) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H::L; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
     fvec = []
 
     grads = similar(x)
-    Hv = LHvpOperator(x, H!)
+    Hv = LHvpOperator(H, x)
 
     for i = 1:itmax
         #compute loss, gradient, and update Hv
@@ -138,7 +139,7 @@ Input:
     grads :: function gradients
     Hv :: hessian operator
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=False) where {S<:AbstractVector{<:AbstractFloat}, F}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=false) where {S<:AbstractVector{<:AbstractFloat}, F}
     #compute regularization
     g_norm = norm(grads)
     λ = opt.M*g_norm + opt.ϵ
@@ -147,7 +148,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, g, shifts)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts)
 
     #evaluate integral and update
     if linesearch
