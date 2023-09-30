@@ -17,6 +17,7 @@ mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
+    itmax::Int
 end
 
 #=
@@ -52,7 +53,11 @@ function SFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
-    return SFNOptimizer(M, ϵ, nodes, weights, solver)
+    #max number of Krylov iterations
+    itmax = round(Int, sqrt(dim))
+    # itmax = 2*dim
+
+    return SFNOptimizer(M, ϵ, nodes, weights, solver, itmax)
 end
 
 #=
@@ -78,9 +83,9 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::B
 
         push!(fvec, fval)
 
-        if fval <= sqrt(eps(T))
-            break
-        end
+        # if fval <= sqrt(eps(T))
+        #     break
+        # end
 
         #iterate
         step!(opt, x, f, grads, Hv, linesearch)
@@ -148,7 +153,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.itmax)
 
     #evaluate integral and update
     if linesearch
@@ -164,6 +169,8 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
             x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
     end
+
+    # println(opt.krylov_solver.stats.status)
 
     return nothing
 end
