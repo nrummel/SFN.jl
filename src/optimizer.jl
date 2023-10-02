@@ -83,12 +83,12 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::B
 
         push!(fvec, fval)
 
-        # if fval <= sqrt(eps(T))
-        #     break
-        # end
-
         #iterate
-        step!(opt, x, f, grads, Hv, linesearch)
+        stationary = step!(opt, x, f, grads, Hv, linesearch)
+
+        if stationary
+            return
+        end
 
         update!(Hv, x)
     end
@@ -121,12 +121,12 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H::L; itmax::Int=1000
 
         push!(fvec, fval)
 
-        if fval <= sqrt(eps(T))
-            break
-        end
-
         #iterate
-        step!(opt, x, f, grads, Hv, linesearch)
+        stationary = step!(opt, x, f, grads, Hv, linesearch)
+
+        if stationary
+            return
+        end
 
         update!(Hv, x)
     end
@@ -144,9 +144,14 @@ Input:
     grads :: function gradients
     Hv :: hessian operator
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=false) where {S<:AbstractVector{<:AbstractFloat}, F}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
     #compute regularization
     g_norm = norm(grads)
+
+    if g_norm <= sqrt(eps(T))
+        return 1
+    end
+
     λ = opt.M*g_norm + opt.ϵ
 
     #compute shifts
@@ -172,5 +177,5 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
 
     # println(opt.krylov_solver.stats.status)
 
-    return nothing
+    return 0
 end
