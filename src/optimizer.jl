@@ -54,8 +54,8 @@ function SFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}
     @. nodes = nodes^2
 
     #max number of Krylov iterations
-    itmax = round(Int, sqrt(dim))
-    # itmax = 2*dim
+    # itmax = round(Int, sqrt(dim))
+    itmax = 2*dim
 
     return SFNOptimizer(M, ϵ, nodes, weights, solver, itmax)
 end
@@ -87,7 +87,7 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::B
         stationary = step!(opt, x, f, grads, Hv, linesearch)
 
         if stationary
-            return
+            break
         end
 
         update!(Hv, x)
@@ -125,7 +125,7 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H::L; itmax::Int=1000
         stationary = step!(opt, x, f, grads, Hv, linesearch)
 
         if stationary
-            return
+            break
         end
 
         update!(Hv, x)
@@ -149,7 +149,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
     g_norm = norm(grads)
 
     if g_norm <= sqrt(eps(T))
-        return 1
+        return true
     end
 
     λ = opt.M*g_norm + opt.ϵ
@@ -177,5 +177,5 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
 
     # println(opt.krylov_solver.stats.status)
 
-    return 0
+    return false
 end
