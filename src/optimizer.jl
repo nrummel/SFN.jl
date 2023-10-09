@@ -71,29 +71,21 @@ Input:
     linesearch :: whether to use step-size with linesearch
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
-    fvec = []
-
-    grads = similar(x)
+    #setup hvp operator
     Hv = RHvpOperator(f, x)
 
-    for i = 1:itmax
-        #construct gradient and hvp operator
+    #
+    function fg!(grads, x)
         fval, back = pullback(f, x)
         grads .= back(one(fval))[1]
 
-        push!(fvec, fval)
-
-        #iterate
-        stationary = step!(opt, x, f, grads, Hv, linesearch)
-
-        if stationary
-            break
-        end
-
-        update!(Hv, x)
+        return fval
     end
 
-    return fvec
+    #iterate
+    stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
+
+    return stats
 end
 
 #=
@@ -108,31 +100,67 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, g!::F2, H::L; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
-    fvec = []
-
-    grads = similar(x)
+function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+    #setup hvp operator
     Hv = LHvpOperator(H, x)
 
+    #iterate
+    stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
+
+    return stats
+end
+
+#=
+Repeatedly applies the SFN iteration to minimize the function.
+
+Input:
+    opt :: SFNOptimizer
+    x :: initialization
+    f :: scalar valued function
+    fg! :: compute f and gradient norm after inplace update of gradient
+    Hv :: hvp operator
+    itmax :: maximum iterations
+    linesearch :: whether to use step-size with linesearch
+=#
+function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::HvpOperator, itmax::Int, linesearch::Bool) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2}
+    stats = SFNStats()
+    
+    grads = similar(x)
+
+    converged = false
+    iterations = itmax
+    
     for i = 1:itmax
-        #compute loss, gradient, and update Hv
-        fval = f(x)
-        g!(x, grads)
+        #compute function and gradient
+        fval = fg!(grads, x)
+        g_norm = norm(grads)
 
-        push!(fvec, fval)
+        #update stats
+        push!(stats.f_seq, fval)
+        push!(stats.g_seq, g_norm)
 
-        #iterate
-        stationary = step!(opt, x, f, grads, Hv, linesearch)
+        #step
+        step!(opt, x, f, grads, Hv, fval, g_norm, linesearch)
 
-        if stationary
+        #check gradient norm
+        if g_norm <= sqrt(eps(T))
+            converged = true
+            iterations = i
             break
         end
 
+        #update hvp operator
         update!(Hv, x)
     end
 
-    return fvec
+    #update stats
+    stats.converged = converged
+    stats.iterations = iterations
+    stats.hvp_evals = Hv.nProd
+
+    return stats
 end
+
 
 #=
 Computes an update step according to the shifted Lanczos-CG update rule.
@@ -143,16 +171,12 @@ Input:
     f :: scalar valued function
     grads :: function gradients
     Hv :: hessian operator
+    g_norm :: gradient norm
+    linesearch:: whether to use linesearch
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, fval::T, g_norm::T, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
     #compute regularization
-    g_norm = norm(grads)
-
-    if g_norm <= sqrt(eps(T))
-        return true
-    end
-
-    λ = opt.M*g_norm + opt.ϵ
+    λ = opt.M*g_norm
 
     #compute shifts
     shifts = opt.quad_nodes .+ λ
@@ -162,13 +186,13 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
 
     #evaluate integral and update
     if linesearch
-        p = similar(x)
+        p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
         @inbounds for i = 1:size(shifts, 1)
             p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
 
-        x .= search!(p, x, f, g_norm)
+        search!(x, p, f, fval, λ)
     else
         @inbounds for i = 1:size(shifts, 1)
             x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
@@ -177,5 +201,5 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, linesea
 
     # println(opt.krylov_solver.stats.status)
 
-    return false
+    return
 end

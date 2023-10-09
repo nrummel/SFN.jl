@@ -14,6 +14,7 @@ export SFNOptimizer, minimize!
 
 include("hvp.jl")
 include("linesearch.jl")
+include("stats.jl")
 include("optimizer.jl")
 
 #=

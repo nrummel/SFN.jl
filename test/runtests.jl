@@ -12,6 +12,13 @@ else
     run_all = false
 end
 
+#=
+Some global utilities
+=#
+
+#=
+Include tests
+=#
 include("hvp_test.jl")
 include("optimizer_test.jl")
 include("flux_test.jl")

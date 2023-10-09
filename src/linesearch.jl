@@ -13,26 +13,32 @@ Regularization line-search.
 In place step-size line-search
 
 Input:
-    p :: search direction
-    x :: current iterate
+    x :: search direction
+    p :: current iterate
     f :: scalar valued function
-    g_norm :: gradient norm
+    λ :: regularization
     α :: float in (0,1)
 =#
-function search!(p::S, x::S, f::F, g_norm::T; α::T=0.5) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+function search!(x::S, p::S, f::F, fval::T, λ::T; α::T=0.5) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
 
     @assert (0<α && α<1)
 
-    λ = g_norm
+    dec = sqrt(λ)*(1-3*sqrt(3))/6
 
+    #NOTE: Can we just iteratively update x, is that even that much better?
+    #NOTE: This should always exit, but we could also just iterate until r is too small
     while true
-        r = norm(p-x)^2
+        r = norm(p)^2
 
-        if f(p)-f(x) ≤ -(5/6)*λ*r
-            return nothing
+        if f(x+p)-fval ≤ dec*r
+            break
         else
             p .*= α
         end
     end
+
+    x .+= p
+
+    return nothing
 
 end

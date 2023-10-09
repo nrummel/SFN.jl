@@ -19,11 +19,24 @@ if run_all || "optimizer" in ARGS
         Test SFN optimizer
         =#
         @testset "SFN optimizer" begin
-            x = [0.0, 3.0]
+            dim = rand(2:100)
+            x = zeros(dim)
 
             opt = SFNOptimizer(size(x,1))
 
             @test_nowarn minimize!(opt, x, rosenbrock, itmax=5)
+        end
+
+        #=
+        Test SFN linesearch
+        =#
+        @testset "SFN linesearch" begin
+            dim = rand(2:100)
+            x = rand(dim)
+
+            opt = SFNOptimizer(size(x,1))
+
+            @test_nowarn minimize!(opt, x, rosenbrock, itmax=1, linesearch=true)
         end
     end
 end
