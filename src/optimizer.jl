@@ -11,13 +11,13 @@ using Zygote: pullback
 #=
 SFN optimizer struct.
 =#
-mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}}
+mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, I<:Integer}
     M::T1 #hessian lipschitz constant
     ϵ::T2#regularization minimum
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    itmax::Int
+    itmax::I
 end
 
 #=
@@ -32,7 +32,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function SFNOptimizer(dim::Int, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::Int=20) where {T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
@@ -70,13 +70,14 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F, I<:Integer}
     #setup hvp operator
     Hv = RHvpOperator(f, x)
 
     #
-    function fg!(grads, x)
-        fval, back = pullback(f, x)
+    function fg!(grads::S, x::S)
+        
+        fval, back = let f=f; pullback(f, x) end
         grads .= back(one(fval))[1]
 
         return fval
@@ -100,7 +101,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::Int=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I<:Integer}
     #setup hvp operator
     Hv = LHvpOperator(H, x)
 
@@ -122,8 +123,8 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::HvpOperator, itmax::Int, linesearch::Bool) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2}
-    stats = SFNStats()
+function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, linesearch::Bool) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I<:Integer}
+    stats = SFNStats(T)
     
     grads = similar(x)
 
@@ -174,7 +175,7 @@ Input:
     g_norm :: gradient norm
     linesearch:: whether to use linesearch
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, fval::T, g_norm::T, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
     #compute regularization
     λ = opt.M*g_norm
 
@@ -188,14 +189,14 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::HvpOperator, fval::T
     if linesearch
         p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
-        @inbounds for i = 1:size(shifts, 1)
-            p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        @simd for i in eachindex(shifts)
+            @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
 
         search!(x, p, f, fval, λ)
     else
-        @inbounds for i = 1:size(shifts, 1)
-            x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        @simd for i in eachindex(shifts)
+            @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
     end
 

@@ -1,4 +1,6 @@
-# Regularized Saddle-Free Newton (R-SFN)
+# SFN.jl
+
+## Saddle-Free Newton
 
 ### Authors: [Cooper Simpson](https://rs-coop.github.io/)
 
@@ -13,7 +15,7 @@ where $\mathbf{A}\in\mathbb{R}^{n\times n}$ has strictly positive spectrum, i.e 
 ## License & Citation
 All source code is made available under an MIT license. You can freely use and modify the code, without warranty, so long as you provide attribution to the authors. See `LICENSE` for the full text.
 
-This repository can be cited using the entry in `CITATION`. See [Publications](#publications) for a full list of publications related to R-SFN and influencing this package. If any of these are useful to your own work, please cite them individually.
+This repository can be cited using the GitHub action in the sidebar, or using the metadata in `CITATION.cff`. See [Publications](#publications) for a full list of publications related to R-SFN and influencing this package. If any of these are useful to your own work, please cite them individually.
 
 ## Installation
 This package can be installed just like any other Julia package. From the terminal, after starting the Julia REPL, run the following:

@@ -22,10 +22,10 @@ Input:
 	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::S, Hv::HvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
 	apply!(result, Hv, v)
 
-	for i=1:Hv.power-1
+	@inbounds for i=1:Hv.power-1
 		apply!(result, Hv, result)
 	end
 

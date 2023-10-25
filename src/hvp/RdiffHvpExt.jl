@@ -27,13 +27,13 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
+mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator
 	x::S
 	dualCache1::Vector{Dual{F, T, 1}}
 	dualCache2::Vector{Dual{F, T, 1}}
 	tape::AbstractTape
-	nProd::Integer
-	power::Integer
+	nProd::I
+	power::I
 end
 
 #=
@@ -61,7 +61,7 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function RHvpOperator(f::F, x::S; power::Integer=2, compile_tape=true) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+function RHvpOperator(f::F, x::S; power::I=2, compile_tape=true) where {F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer}
 
 	dualCache1 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 	dualCache2 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
