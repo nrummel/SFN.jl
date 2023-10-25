@@ -32,7 +32,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20, krylov_order::I=0) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
@@ -54,8 +54,12 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     @. nodes = nodes^2
 
     #max number of Krylov iterations
-    # itmax = round(Int, sqrt(dim))
-    itmax = 2*dim
+    if krylov_order == 0
+        # itmax = round(Int, sqrt(dim))
+        itmax = 2*dim
+    else
+        itmax = krylov_order
+    end
 
     return SFNOptimizer(M, ϵ, nodes, weights, solver, itmax)
 end
