@@ -17,7 +17,8 @@ mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, 
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    itmax::I
+    krylov_itmax::I #maximum Krylov subspace size
+    tol::T2 #gradient norm tolerance for exit
 end
 
 #=
@@ -32,7 +33,7 @@ Input:
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
 =#
-function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20, krylov_order::I=0) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20, krylov_order::I=0, tol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
@@ -56,12 +57,12 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     #max number of Krylov iterations
     if krylov_order == 0
         # itmax = round(Int, sqrt(dim))
-        itmax = 2*dim
+        krylov_itmax = 2*dim
     else
-        itmax = krylov_order
+        krylov_itmax = krylov_order
     end
 
-    return SFNOptimizer(M, ϵ, nodes, weights, solver, itmax)
+    return SFNOptimizer(M, ϵ, nodes, weights, solver, krylov_itmax, tol)
 end
 
 #=
@@ -148,7 +149,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, line
         step!(opt, x, f, grads, Hv, fval, g_norm, linesearch)
 
         #check gradient norm
-        if g_norm <= sqrt(eps(T))
+        if g_norm <= opt.tol
             converged = true
             iterations = i
             break
@@ -187,7 +188,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.itmax)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_itmax)
 
     #evaluate integral and update
     if linesearch
