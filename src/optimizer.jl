@@ -89,7 +89,11 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Boo
     end
 
     #iterate
+    tic = time_ns
     stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
+    toc = elapsed(tic)
+
+    stats.run_time = toc
 
     return stats
 end
@@ -111,7 +115,11 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000,
     Hv = LHvpOperator(H, x)
 
     #iterate
+    tic = time_ns()
     stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
+    toc = elapsed(tic)
+
+    stats.run_time = toc
 
     return stats
 end
