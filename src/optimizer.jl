@@ -89,7 +89,7 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Boo
     end
 
     #iterate
-    tic = time_ns
+    tic = time_ns()
     stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
     toc = elapsed(tic)
 
