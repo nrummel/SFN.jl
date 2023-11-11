@@ -31,3 +31,13 @@ function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:A
 
 	return nothing
 end
+
+#=
+In place update of RHvpOperator
+Input:
+=#
+function reset!(Hv::HvpOperator)
+	Hv.nProd = 0
+
+	return nothing
+end

@@ -60,7 +60,6 @@ Input:
 =#
 function update!(Hv::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hv.duplicated = Duplicated(x, similar(x))
-	Hv.nProd = 0
 
 	return nothing
 end

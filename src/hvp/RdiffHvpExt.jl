@@ -49,7 +49,6 @@ Input:
 =#
 function update!(Hv::RHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hv.x .= x
-	Hv.nProd = 0
 
 	return nothing
 end

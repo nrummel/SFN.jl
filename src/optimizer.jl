@@ -32,6 +32,8 @@ Input:
     M :: hessian lipschitz constant
     ϵ :: regularization minimum
     quad_order :: number of quadrature nodes
+    krylov_order :: max Krylov subspace size
+    tol :: gradient norm tolerance to declare convergence
 =#
 function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20, krylov_order::I=0, tol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
     #quadrature
@@ -54,15 +56,7 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
-    #max number of Krylov iterations
-    if krylov_order == 0
-        # itmax = round(Int, sqrt(dim))
-        krylov_itmax = 2*dim
-    else
-        krylov_itmax = krylov_order
-    end
-
-    return SFNOptimizer(M, ϵ, nodes, weights, solver, krylov_itmax, tol)
+    return SFNOptimizer(M, ϵ, nodes, weights, solver, krylov_order, tol)
 end
 
 #=
@@ -144,7 +138,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, line
     converged = false
     iterations = itmax
     
-    for i = 1:itmax
+    for i = 1:itmax+1
         #compute function and gradient
         fval = fg!(grads, x)
         g_norm = norm(grads)
@@ -153,15 +147,19 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, line
         push!(stats.f_seq, fval)
         push!(stats.g_seq, g_norm)
 
-        #step
-        step!(opt, x, f, grads, Hv, fval, g_norm, linesearch)
-
         #check gradient norm
         if g_norm <= opt.tol
             converged = true
-            iterations = i
+            iterations = i-1
             break
         end
+
+        if i==itmax+1
+            break
+        end
+
+        #step
+        step!(opt, x, f, grads, Hv, fval, g_norm, linesearch)
 
         #update hvp operator
         update!(Hv, x)
@@ -196,7 +194,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_itmax)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order)
 
     #evaluate integral and update
     if linesearch

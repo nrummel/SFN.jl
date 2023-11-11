@@ -34,7 +34,6 @@ Input:
 function update!(Hv::LHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hv.x .= x
     Hv.hessian = Hv.f(x)
-	Hv.nProd = 0
 
 	return nothing
 end
