@@ -17,7 +17,7 @@ mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, 
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    krylov_itmax::I #maximum Krylov subspace size
+    krylov_order::I #maximum Krylov subspace size
     tol::T2 #gradient norm tolerance for exit
 end
 
