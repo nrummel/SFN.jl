@@ -69,7 +69,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F, I<:Integer}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #setup hvp operator
     Hv = RHvpOperator(f, x)
 
@@ -100,7 +100,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; linesearch::Bool=false, itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I<:Integer}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; linesearch::Bool=false, itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
     Hv = LHvpOperator(H, x)
 
@@ -122,7 +122,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, linesearch::Bool, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I<:Integer}
+function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, linesearch::Bool, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
     tic = time_ns()
     
     stats = SFNStats(T)
