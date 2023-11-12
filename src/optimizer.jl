@@ -69,7 +69,7 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F, I<:Integer}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F, I<:Integer}
     #setup hvp operator
     Hv = RHvpOperator(f, x)
 
@@ -83,11 +83,7 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Boo
     end
 
     #iterate
-    tic = time_ns()
-    stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
-    toc = elapsed(tic)
-
-    stats.run_time = toc
+    stats = iterate!(opt, x, f, fg!, Hv, linesearch, itmax, time_limit)
 
     return stats
 end
@@ -104,16 +100,12 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I<:Integer}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; linesearch::Bool=false, itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I<:Integer}
     #setup hvp operator
     Hv = LHvpOperator(H, x)
 
     #iterate
-    tic = time_ns()
-    stats = iterate!(opt, x, f, fg!, Hv, itmax, linesearch)
-    toc = elapsed(tic)
-
-    stats.run_time = toc
+    stats = iterate!(opt, x, f, fg!, Hv, linesearch, itmax, time_limit)
 
     return stats
 end
@@ -130,15 +122,17 @@ Input:
     itmax :: maximum iterations
     linesearch :: whether to use step-size with linesearch
 =#
-function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, linesearch::Bool) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I<:Integer}
+function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, linesearch::Bool, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I<:Integer}
+    tic = time_ns()
+    
     stats = SFNStats(T)
     
     grads = similar(x)
 
     converged = false
-    iterations = itmax
+    iterations = 0
     
-    for i = 1:itmax+1
+    while iterations<itmax+1
         #compute function and gradient
         fval = fg!(grads, x)
         g_norm = norm(grads)
@@ -150,11 +144,11 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, line
         #check gradient norm
         if g_norm <= opt.tol
             converged = true
-            iterations = i-1
             break
         end
 
-        if i==itmax+1
+        #check other exit conditions
+        if (elapsed(tic)>=time_limit) || (iterations==itmax+1)
             break
         end
 
@@ -163,12 +157,16 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, line
 
         #update hvp operator
         update!(Hv, x)
+
+        #increment
+        iterations += 1
     end
 
     #update stats
     stats.converged = converged
     stats.iterations = iterations
     stats.hvp_evals = Hv.nProd
+    stats.run_time = elapsed(tic)
 
     return stats
 end
