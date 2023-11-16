@@ -26,7 +26,7 @@ function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:A
 	apply!(result, Hv, v)
 
 	@inbounds for i=1:Hv.power-1
-		apply!(result, Hv, result)
+		apply!(result, Hv, result) #NOTE: Is this okay reusing result like this?
 	end
 
 	return nothing

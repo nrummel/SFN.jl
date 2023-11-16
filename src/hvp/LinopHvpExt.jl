@@ -12,18 +12,18 @@ export LHvpOperator
 #=
 
 =#
-mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
+mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer, L} <: HvpOperator
     f::F
     x::S
-    hessian::LinearOperator
-    nProd::Integer
-    power::Integer
+    Hop::L
+    nProd::I
+    power::I
 end
 
 #=
 Base implementations for LHvpOperator
 =#
-Base.eltype(Hv::LHvpOperator{F, T, S}) where {F, T, S} = T
+Base.eltype(Hv::LHvpOperator{F, T, S, I, L}) where {F, T, S, I, L} = T
 Base.size(Hv::LHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
@@ -33,7 +33,7 @@ Input:
 =#
 function update!(Hv::LHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hv.x .= x
-    Hv.hessian = Hv.f(x)
+    Hv.Hop = Hv.f(x)
 
 	return nothing
 end
@@ -45,7 +45,7 @@ Input:
     f :: function that builds hessian operator
 	x :: input to f
 =#
-function LHvpOperator(f::F, x::S; power::Integer=2) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+function LHvpOperator(f::F, x::S; power::I=2) where {F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer}
 	return LHvpOperator(f, x, f(x), 0, power)
 end
 
@@ -60,7 +60,7 @@ Input:
 function apply!(result::S, Hv::LHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
     Hv.nProd += 1
 
-    mul!(result, Hv.hessian, v)
+    mul!(result, Hv.Hop, v)
 
     return nothing
 end

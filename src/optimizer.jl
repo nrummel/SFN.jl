@@ -44,9 +44,6 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
         println("Quadrature weight precision reached, using $(size(nodes,1)) quadrature locations.")
     end
 
-    #krylov solver
-    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
-
     #=
     NOTE: Performing some extra global operations here.
     - Integral constant
@@ -55,6 +52,9 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     =#
     @. weights = (2/pi)*weights*exp(nodes)
     @. nodes = nodes^2
+
+    #krylov solver
+    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
     return SFNOptimizer(M, ϵ, nodes, weights, solver, krylov_order, tol)
 end
