@@ -14,11 +14,13 @@ SFN optimizer struct.
 mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, I<:Integer}
     M::T1 #hessian lipschitz constant
     ϵ::T2#regularization minimum
+    linesearch::Bool #whether to use linsearch
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
     krylov_order::I #maximum Krylov subspace size
-    tol::T2 #gradient norm tolerance for exit
+    atol::T2 #absolute gradient norm tolerance
+    rtol::T2 #relative gradient norm tolerance
 end
 
 #=
@@ -35,7 +37,12 @@ Input:
     krylov_order :: max Krylov subspace size
     tol :: gradient norm tolerance to declare convergence
 =#
-function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), quad_order::I=20, krylov_order::I=0, tol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), linesearch::Bool=false, quad_order::I=20, krylov_order::I=dim, atol::T2=1e-6, rtol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+    #regularization
+    if linesearch
+        M = 1.0
+    end
+    
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
@@ -56,7 +63,7 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
 
-    return SFNOptimizer(M, ϵ, nodes, weights, solver, krylov_order, tol)
+    return SFNOptimizer(M, ϵ, linesearch, nodes, weights, solver, krylov_order, atol, rtol)
 end
 
 #=
@@ -67,9 +74,9 @@ Input:
     x :: initialization
     f :: scalar valued function
     itmax :: maximum iterations
-    linesearch :: whether to use step-size with linesearch
+    time_limit :: maximum run time
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Bool=false, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
+function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #setup hvp operator
     Hv = RHvpOperator(f, x)
 
@@ -83,7 +90,7 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, linesearch::Boo
     end
 
     #iterate
-    stats = iterate!(opt, x, f, fg!, Hv, linesearch, itmax, time_limit)
+    stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
 
     return stats
 end
@@ -98,14 +105,14 @@ Input:
     g! :: inplace gradient function of f
     H :: hvp generator
     itmax :: maximum iterations
-    linesearch :: whether to use step-size with linesearch
+    time_limit :: maximum run time
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; linesearch::Bool=false, itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
+function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
     Hv = LHvpOperator(H, x)
 
     #iterate
-    stats = iterate!(opt, x, f, fg!, Hv, linesearch, itmax, time_limit)
+    stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
 
     return stats
 end
@@ -120,40 +127,56 @@ Input:
     fg! :: compute f and gradient norm after inplace update of gradient
     Hv :: hvp operator
     itmax :: maximum iterations
-    linesearch :: whether to use step-size with linesearch
+    time_limit :: maximum run time
 =#
-function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, linesearch::Bool, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
+function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
+    #start time
     tic = time_ns()
     
+    #stats
     stats = SFNStats(T)
-    
-    grads = similar(x)
-
     converged = false
     iterations = 0
     
+    #gradient allocation
+    grads = similar(x)
+
+    #compute function and gradient
+    fval = fg!(grads, x)
+    g_norm = norm(grads)
+
+    #compute tolerance
+    tol = opt.atol + opt.rtol*g_norm
+
+    #initial stats
+    push!(stats.f_seq, fval)
+    push!(stats.g_seq, g_norm)
+
+    #iterate
     while iterations<itmax+1
-        #compute function and gradient
+        #check gradient norm
+        if g_norm <= tol
+            converged = true
+            break
+        end
+
+        #check other exit conditions
+        time = elapsed(tic)
+
+        if (time>=time_limit) || (iterations==itmax)
+            break
+        end
+
+        #step
+        step!(opt, x, f, grads, Hv, fval, g_norm, time_limit-time)
+
+        #update function and gradient
         fval = fg!(grads, x)
         g_norm = norm(grads)
 
         #update stats
         push!(stats.f_seq, fval)
         push!(stats.g_seq, g_norm)
-
-        #check gradient norm
-        if g_norm <= opt.tol
-            converged = true
-            break
-        end
-
-        #check other exit conditions
-        if (elapsed(tic)>=time_limit) || (iterations==itmax+1)
-            break
-        end
-
-        #step
-        step!(opt, x, f, grads, Hv, fval, g_norm, linesearch)
 
         #update hvp operator
         update!(Hv, x)
@@ -184,7 +207,7 @@ Input:
     g_norm :: gradient norm
     linesearch:: whether to use linesearch
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, linesearch::Bool=false) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
+function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
     #compute regularization
     λ = opt.M*g_norm
 
@@ -192,10 +215,10 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::
     shifts = opt.quad_nodes .+ λ
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order)
+    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order, timemax=time_limit)
 
     #evaluate integral and update
-    if linesearch
+    if opt.linesearch
         p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
         @simd for i in eachindex(shifts)
