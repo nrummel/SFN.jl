@@ -7,6 +7,7 @@ SFN optimizer stats
 mutable struct SFNStats{I<:Integer, S<:AbstractVector{<:AbstractFloat}}
     converged::Bool #whether optimizer has converged
     iterations::I #number of optimizer iterations
+    f_evals::I #number of function evaluations
     hvp_evals::I #number of hvp evaluations
     run_time::Float64 #iteration runtime
     f_seq::S #function value sequence
@@ -19,7 +20,7 @@ Outer constructor
 Input
 =#
 function SFNStats(type::Type{<:AbstractFloat})
-    return SFNStats(false, 0, 0, 0.0, type[], type[])
+    return SFNStats(false, 0, 0, 0, 0.0, type[], type[])
 end
 
 #=

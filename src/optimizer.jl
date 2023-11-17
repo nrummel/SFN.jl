@@ -168,7 +168,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         end
 
         #step
-        step!(opt, x, f, grads, Hv, fval, g_norm, time_limit-time)
+        step!(opt, stats, x, f, grads, Hv, fval, g_norm, time_limit-time)
 
         #update function and gradient
         fval = fg!(grads, x)
@@ -188,6 +188,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     #update stats
     stats.converged = converged
     stats.iterations = iterations
+    stats.f_evals += iterations+1
     stats.hvp_evals = Hv.nProd
     stats.run_time = elapsed(tic)
 
@@ -207,7 +208,7 @@ Input:
     g_norm :: gradient norm
     linesearch:: whether to use linesearch
 =#
-function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
+function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
     #compute regularization
     λ = opt.M*g_norm
 
@@ -225,7 +226,7 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::
             @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
 
-        search!(x, p, f, fval, λ)
+        stats.f_evals += search!(x, p, f, fval, λ)
     else
         @simd for i in eachindex(shifts)
             @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
@@ -234,5 +235,5 @@ function step!(opt::SFNOptimizer, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::
 
     # println(opt.krylov_solver.stats.status)
 
-    return
+    return nothing
 end

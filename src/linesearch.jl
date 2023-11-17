@@ -27,7 +27,11 @@ function search!(x::S, p::S, f::F, fval::T, λ::T; α::T=0.5) where {F, T<:Abstr
 
     #NOTE: Can we just iteratively update x, is that even that much better?
     #NOTE: This should always exit, but we could also just iterate until r is too small
+    iterations = 0
+
     while true
+        iterations += 1
+
         r = norm(p)^2
 
         if f(x+p)-fval ≤ dec*r
@@ -39,6 +43,6 @@ function search!(x::S, p::S, f::F, fval::T, λ::T; α::T=0.5) where {F, T<:Abstr
 
     x .+= p
 
-    return nothing
+    return iterations
 
 end
