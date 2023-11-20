@@ -11,10 +11,10 @@ using Zygote: pullback
 #=
 SFN optimizer struct.
 =#
-mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, I<:Integer}
+mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, I<:Integer, LS}
     M::T1 #hessian lipschitz constant
-    ϵ::T2#regularization minimum
-    linesearch::Bool #whether to use linsearch
+    ϵ::T2 #regularization minimum
+    linesearch::LS #whether to use linsearch
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
@@ -41,6 +41,9 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     #regularization
     if linesearch
         M = 1.0
+        linesearch = SFNLineSearcher()
+    else
+        linesearch = nothing
     end
     
     #quadrature
@@ -218,19 +221,22 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
     cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order, timemax=time_limit)
 
+    #
+    push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
+
     #evaluate integral and update
-    if opt.linesearch
+    if isnothing(opt.linesearch)
+        @simd for i in eachindex(shifts)
+            @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        end
+    else
         p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
         @simd for i in eachindex(shifts)
             @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
 
-        stats.f_evals += search!(x, p, f, fval, λ)
-    else
-        @simd for i in eachindex(shifts)
-            @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
-        end
+        search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
 
     # println(opt.krylov_solver.stats.status)
