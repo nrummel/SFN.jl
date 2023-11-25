@@ -65,6 +65,9 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
 
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
+    if krylov_order == -1
+        krylov_order = Int(ceil(log(dim)))
+    end
 
     return SFNOptimizer(M, ϵ, linesearch, nodes, weights, solver, krylov_order, atol, rtol)
 end
@@ -213,7 +216,7 @@ Input:
 =#
 function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
     #compute regularization
-    λ = opt.M*g_norm
+    λ = opt.M*g_norm #+ opt.ϵ
 
     #compute shifts
     shifts = opt.quad_nodes .+ λ
