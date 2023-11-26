@@ -76,6 +76,9 @@ Input:
     λ :: regularization
 =#
 function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+
+    #exit status
+    status = true
     
     #increase step-size first
     searcher.η *= 2
@@ -84,19 +87,18 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
     
     dec = sqrt(λ)*(1-3*sqrt(3))/6
 
-    # println(norm(p)^2)
-
     #NOTE: Can we just iteratively update x, is that even that much better?
     #NOTE: This should always exit, but we could also just iterate until r is too small
 
     while true
-        stats.f_evals += 1
-
         r = norm(p)^2
 
-        if r < eps(T)
+        if (r < eps(T)) || (isnan(r))
+            status = false
             break
         end
+
+        stats.f_evals += 1
 
         if f(x+p)-fval ≤ dec*r
             break
@@ -109,5 +111,5 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
 
     x .+= p
 
-    return nothing
+    return status
 end

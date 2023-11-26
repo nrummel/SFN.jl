@@ -174,7 +174,11 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         end
 
         #step
-        step!(opt, stats, x, f, grads, Hv, fval, g_norm, time_limit-time)
+        success = step!(opt, stats, x, f, grads, Hv, fval, g_norm, time_limit-time)
+
+        if success == false
+            break
+        end
 
         #update function and gradient
         fval = fg!(grads, x)
@@ -219,10 +223,15 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     λ = opt.M*g_norm #+ opt.ϵ
 
     #compute shifts
+    #NOTE: When the regularization is very large, these shifts are essentially the same
     shifts = opt.quad_nodes .+ λ
+
+    # println(shifts)
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
     cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order, timemax=time_limit)
+
+    # println(opt.krylov_solver.converged)
 
     #
     push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
@@ -232,6 +241,8 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
         @simd for i in eachindex(shifts)
             @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
+
+        status = true
     else
         p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
@@ -239,10 +250,10 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
             @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
 
-        search!(opt.linesearch, stats, x, p, f, fval, λ)
+        status = search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
 
     # println(opt.krylov_solver.stats.status)
 
-    return nothing
+    return status
 end
