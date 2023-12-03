@@ -37,7 +37,7 @@ Input:
     krylov_order :: max Krylov subspace size
     tol :: gradient norm tolerance to declare convergence
 =#
-function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), linesearch::Bool=false, quad_order::I=20, krylov_order::I=dim, atol::T2=1e-6, rtol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), linesearch::Bool=false, quad_order::I=20, krylov_order::I=dim, atol::T2=1e-5, rtol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
     #regularization
     if linesearch
         M = 1.0
@@ -65,7 +65,9 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
 
     #krylov solver
     solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
-    if krylov_order == -1
+    if krylov_order == 0
+        krylov_order = dim
+    elseif krylov_order == -1
         krylov_order = Int(ceil(log(dim)))
     end
 
@@ -225,6 +227,8 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     #compute shifts
     #NOTE: When the regularization is very large, these shifts are essentially the same
     shifts = opt.quad_nodes .+ λ
+    # shifts = opt.quad_nodes .+ 1e15
+    # shifts = 10.0 .^ (collect(-20.0:1.0:20.0))
 
     # println(shifts)
 
@@ -232,28 +236,28 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order, timemax=time_limit)
 
     # println(opt.krylov_solver.converged)
+    # println(opt.krylov_solver.stats.status)
+    # println()
 
     #
     push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
 
     #evaluate integral and update
+    status = true
+
     if isnothing(opt.linesearch)
         @simd for i in eachindex(shifts)
             @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
-
-        status = true
     else
         p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
         @simd for i in eachindex(shifts)
             @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
-
+        
         status = search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
-
-    # println(opt.krylov_solver.stats.status)
 
     return status
 end

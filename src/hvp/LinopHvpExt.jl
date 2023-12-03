@@ -15,7 +15,7 @@ export LHvpOperator
 mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer, L} <: HvpOperator
     f::F
     x::S
-    Hop::L
+    op::L
     nProd::I
     power::I
 end
@@ -33,7 +33,7 @@ Input:
 =#
 function update!(Hv::LHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
 	Hv.x .= x
-    Hv.Hop = Hv.f(x)
+    Hv.op = Hv.f(x)
 
 	return nothing
 end
@@ -60,7 +60,7 @@ Input:
 function apply!(result::S, Hv::LHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
     Hv.nProd += 1
 
-    mul!(result, Hv.Hop, v)
+    mul!(result, Hv.op, v)
 
     return nothing
 end

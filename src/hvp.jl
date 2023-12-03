@@ -24,8 +24,9 @@ Input:
 =#
 function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
 	apply!(result, Hv, v)
-
+	# temp = similar(result)
 	@inbounds for i=1:Hv.power-1
+		# temp .= result
 		apply!(result, Hv, result) #NOTE: Is this okay reusing result like this?
 	end
 
