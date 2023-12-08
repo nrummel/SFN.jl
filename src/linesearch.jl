@@ -91,10 +91,17 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
     #NOTE: This should always exit, but we could also just iterate until r is too small
 
     while true
-        r = norm(p)^2
+        r = min(norm(p)^2, eps(T))
 
-        if (r < eps(T)) || (isnan(r))
+        # if (r < eps(T)) || (isnan(r))
+        #     status = false
+        #     println("Linesearch failed, Residual norm: ", r)
+        #     break
+        # end
+
+        if (searcher.η < eps(T)) || (isnan(searcher.η))
             status = false
+            println("Linesearch failed")
             break
         end
 
