@@ -284,7 +284,7 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
         #     # @inbounds p .+= opt.quad_weights[i]*opt.krylov_solver.x[i]
         #     @inbounds p .+= opt.quad_weights[i]*solver.y
         # end
-        println("Update norm: ", norm(p), '\n')
+        # println("Update norm: ", norm(p), '\n')
         status = search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
 
