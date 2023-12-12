@@ -25,6 +25,7 @@ Base implementations for LHvpOperator
 =#
 Base.eltype(Hv::LHvpOperator{F, T, S, I, L}) where {F, T, S, I, L} = T
 Base.size(Hv::LHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
+Base.adjoint(Hv::LHvpOperator) = Hv
 
 #=
 In place update of LHvpOperator

@@ -81,38 +81,42 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
     status = true
     
     #increase step-size first
-    searcher.η *= 2
-    p .*= searcher.η
-    # searcher.η = 1.0
+    if searcher.η >= 1.0
+        searcher.η *= 2
+        p .*= searcher.η
+    else
+        searcher.η = 1.0
+    end
+
+    #search direction norm
+    p_norm = norm(p)
+
+    if p_norm < eps(T)
+        println("Search direction too small")
+        return false
+    end
     
-    dec = sqrt(λ)*(1-3*sqrt(3))/6
+    #target decrement
+    dec = p_norm^2*sqrt(λ)*(1-3*sqrt(3))/6
 
     #NOTE: Can we just iteratively update x, is that even that much better?
-    #NOTE: This should always exit, but we could also just iterate until r is too small
-
     while true
-        r = min(norm(p)^2, eps(T))
+        stats.f_evals += 1
 
-        # if (r < eps(T)) || (isnan(r))
-        #     status = false
-        #     println("Linesearch failed, Residual norm: ", r)
-        #     break
-        # end
+        if f(x+p)-fval ≤ dec
+            # println(f(x+p)-fval)
+            break
+        else
+            searcher.η *= searcher.α #reduce step-size
+            p .*= searcher.α #scale search direction
+            dec *= searcher.α^2 #scale decrement
+        end
 
+        #check step-size
         if (searcher.η < eps(T)) || (isnan(searcher.η))
             status = false
             println("Linesearch failed")
             break
-        end
-
-        stats.f_evals += 1
-
-        if f(x+p)-fval ≤ dec*r
-            break
-        else
-            searcher.η *= searcher.α
-            p .*= searcher.η
-            # p .*= searcher.α
         end
     end
 

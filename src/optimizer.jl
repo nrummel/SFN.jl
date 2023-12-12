@@ -5,8 +5,10 @@ SFN optimizer.
 =#
 
 using FastGaussQuadrature: gausslaguerre
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!
 using Zygote: pullback
+
+using LinearOperators: Matrix
 
 #=
 SFN optimizer struct.
@@ -117,7 +119,7 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    Hv = LHvpOperator(H, x)
+    Hv = LHvpOperator(H, x, power=1)
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
@@ -223,11 +225,13 @@ Input:
 function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
     #compute regularization
     λ = opt.M*g_norm #+ opt.ϵ
-    println("Reg: ", λ)
+    # println("Reg: ", λ)
 
     #compute shifts
     #NOTE: When the regularization is very large, these shifts are essentially the same
-    shifts = opt.quad_nodes .+ λ
+    # shifts = opt.quad_nodes .+ λ
+
+    # shifts = opt.quad_nodes .+ 1e15
     # shifts = opt.quad_nodes .+ 0.0
     # shifts = 10.0 .^ (collect(-20.0:1.0:20.0))
     # shifts = zero(opt.quad_nodes) .+ 1.0
@@ -236,38 +240,51 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     # println(opt.quad_weights)
 
     #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    cg_lanczos_shift!(opt.krylov_solver, Hv, grads, shifts, itmax=opt.krylov_order, timemax=time_limit)
+    # cg_lanczos_shift!(opt.krylov_solver, Hv, -grads, shifts, itmax=opt.krylov_order, timemax=time_limit, skip=2)
 
-    println(opt.krylov_solver.converged)
-    println(opt.krylov_solver.stats.status)
-    println()
+    #############################################
+    #craigmr
+    # p = zero(x)
+    # solver = CraigmrSolver(length(x), length(x), S)
+
+    # craigmr!(solver, Hv, grads, λ=sqrt(λ), timemax=time_limit)
+    # p .-= solver.y
+    # for i in eachindex(shifts)
+    #     craigmr!(solver, Hv, -grads, λ=sqrt(shifts[i]), itmax=opt.krylov_order, timemax=time_limit)
+    #     p .+= opt.quad_weights[i]*solver.y
+    # end
+    #############################################
+
+    # println(opt.krylov_solver.converged)
+    # println(opt.krylov_solver.stats.status)
+
+    #############################################
+    #eigendecomposition
+    p = zero(x)
+    E = eigen(Hermitian(Matrix(Hv.op)))
+    @. E.values = sqrt(E.values^2+λ)
+    mul!(p, inv(E), -grads)
+    push!(stats.krylov_iterations, 0)
+    #############################################
 
     #
-    push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
+    # push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
 
     #evaluate integral and update
     status = true
 
-    # p = zero(x)
-    # @simd for i in eachindex(shifts)
-    #     @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
-    # end
-    # println("Update norm: ", norm(p))
-
-    # x .-= grads/1e18
-
     if isnothing(opt.linesearch)
         @simd for i in eachindex(shifts)
-            @inbounds x .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
+            @inbounds x .+= opt.quad_weights[i]*opt.krylov_solver.x[i]
         end
     else
-        p = zero(x) #NOTE: Can we not allocate new space for this somehow?
+        # p = zero(x) #NOTE: Can we not allocate new space for this somehow?
 
-        @simd for i in eachindex(shifts)
-            @inbounds p .-= opt.quad_weights[i]*opt.krylov_solver.x[i]
-        end
-        # p = grads/1e18
-        println("Update norm: ", norm(p))
+        # @simd for i in eachindex(shifts)
+        #     # @inbounds p .+= opt.quad_weights[i]*opt.krylov_solver.x[i]
+        #     @inbounds p .+= opt.quad_weights[i]*solver.y
+        # end
+        println("Update norm: ", norm(p), '\n')
         status = search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
 
