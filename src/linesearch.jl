@@ -78,7 +78,7 @@ Input:
 function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
 
     #exit status
-    status = true
+    success = true
     
     #increase step-size first
     if searcher.η >= 1.0
@@ -92,7 +92,7 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
     p_norm = norm(p)
 
     if p_norm < eps(T)
-        println("Search direction too small")
+        stats.status = "search direction too small"
         return false
     end
     
@@ -104,7 +104,6 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
         stats.f_evals += 1
 
         if f(x+p)-fval ≤ dec
-            # println(f(x+p)-fval)
             break
         else
             searcher.η *= searcher.α #reduce step-size
@@ -114,13 +113,13 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
 
         #check step-size
         if (searcher.η < eps(T)) || (isnan(searcher.η))
-            status = false
-            println("Linesearch failed")
+            success = false
+            stats.status = "Linesearch failed"
             break
         end
     end
 
     x .+= p
 
-    return status
+    return success
 end

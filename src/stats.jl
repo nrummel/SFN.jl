@@ -13,6 +13,7 @@ mutable struct SFNStats{I<:Integer, S1<:Vector{<:AbstractFloat}}
     f_seq::S1 #function value sequence
     g_seq::S1 #gradient norm sequence
     krylov_iterations::S1 #number of Krylov iterations #NOTE: We may not want this long term
+    status::String #exit status
 end
 
 #=
@@ -21,7 +22,7 @@ Outer constructor
 Input
 =#
 function SFNStats(type::Type{<:AbstractFloat})
-    return SFNStats(false, 0, 0, 0, 0.0, type[], type[], type[])
+    return SFNStats(false, 0, 0, 0, 0.0, type[], type[], type[], "")
 end
 
 #=

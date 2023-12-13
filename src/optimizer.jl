@@ -271,7 +271,7 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
     # push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
 
     #evaluate integral and update
-    status = true
+    success = true
 
     if isnothing(opt.linesearch)
         @simd for i in eachindex(shifts)
@@ -285,8 +285,8 @@ function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, 
         #     @inbounds p .+= opt.quad_weights[i]*solver.y
         # end
         # println("Update norm: ", norm(p), '\n')
-        status = search!(opt.linesearch, stats, x, p, f, fval, λ)
+        success = search!(opt.linesearch, stats, x, p, f, fval, λ)
     end
 
-    return status
+    return success
 end
