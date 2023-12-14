@@ -32,7 +32,7 @@ mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Intege
 	dualCache1::Vector{Dual{F, T, 1}}
 	dualCache2::Vector{Dual{F, T, 1}}
 	tape::AbstractTape
-	nProd::I
+	nprod::I
 	power::I
 end
 
@@ -60,7 +60,7 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function RHvpOperator(f::F, x::S; power::I=2, compile_tape=true) where {F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer}
+function RHvpOperator(f::F, x::S; power::I=1, compile_tape=true) where {F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer}
 
 	dualCache1 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
 	dualCache2 = Dual{typeof(Tag(Nothing, eltype(x))),eltype(x),1}.(x, Partials.(Tuple.(similar(x))))
@@ -81,7 +81,7 @@ Input:
 	v :: rhs vector
 =#
 function apply!(result::S, Hv::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	Hv.nProd += 1
+	Hv.nprod += 1
 
 	Hv.dualCache1 .= Dual{typeof(Tag(Nothing, eltype(v))),eltype(v),1}.(Hv.x, Partials.(Tuple.(v)))
 

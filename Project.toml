@@ -4,6 +4,7 @@ authors = ["Cooper Simpson"]
 version = "0.1.0"
 
 [deps]
+Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"

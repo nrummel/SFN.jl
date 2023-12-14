@@ -31,7 +31,7 @@ mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOpe
 	f::F
 	x::S
 	dualCache1::AbstractVector{Dual{Nothing,T,1}}
-	nProd::Integer
+	nprod::Integer
 	power::Integer
 end
 
@@ -48,7 +48,7 @@ Input:
 	f :: scalar valued function
 	x :: input to f
 =#
-function ZHvpOperator(f::F, x::S; power::Integer=2) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+function ZHvpOperator(f::F, x::S; power::Integer=1) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
 	dualCache1 = Dual.(x, similar(x))
 
 	return ZHvpOperator(f, x, dualCache1, 0, power)
@@ -63,7 +63,7 @@ Input:
 	v :: rhs vector
 =#
 function apply!(result::S, Hv::ZHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
-	Hv.nProd += 1
+	Hv.nprod += 1
 
 	Hv.dualCache1 .= Dual.(Hv.x, v)
 	val, back = pullback(Hv.f, Hv.dualCache1)

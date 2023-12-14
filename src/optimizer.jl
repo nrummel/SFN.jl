@@ -13,14 +13,11 @@ using LinearOperators: Matrix
 #=
 SFN optimizer struct.
 =#
-mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, I<:Integer, LS}
+mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S, LS}
     M::T1 #hessian lipschitz constant
     ϵ::T2 #regularization minimum
+    solver::S #search direction solver
     linesearch::LS #whether to use linsearch
-    quad_nodes::S #quadrature nodes
-    quad_weights::S #quadrature weights
-    krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    krylov_order::I #maximum Krylov subspace size
     atol::T2 #absolute gradient norm tolerance
     rtol::T2 #relative gradient norm tolerance
 end
@@ -32,14 +29,13 @@ NOTE: FGQ cant currently handle anything other than Float64
 
 Input:
     dim :: dimension of parameters
-    type :: parameter type
     M :: hessian lipschitz constant
     ϵ :: regularization minimum
-    quad_order :: number of quadrature nodes
-    krylov_order :: max Krylov subspace size
-    tol :: gradient norm tolerance to declare convergence
+    linsearch :: whether to use linesearch
+    atol :: absolute gradient norm tolerance
+    rtol :: relative gradient norm tolerance
 =#
-function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; M::T1=1, ϵ::T2=eps(Float64), linesearch::Bool=false, quad_order::I=20, krylov_order::I=0, atol::T2=1e-5, rtol::T2=1e-6) where {T1<:Real, T2<:AbstractFloat, I<:Integer}
+function SFNOptimizer(dim::I, solver::Symbol; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
     #regularization
     if linesearch
         M = 1.0
@@ -47,33 +43,10 @@ function SFNOptimizer(dim::I, type::Type{<:AbstractVector{T2}}=Vector{Float64}; 
     else
         linesearch = nothing
     end
-    
-    #quadrature
-    nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
 
-    if size(nodes, 1) < quad_order
-        quad_order = size(nodes, 1)
-        println("Quadrature weight precision reached, using $(size(nodes,1)) quadrature locations.")
-    end
+    solver = eval(solver)(dim)
 
-    #=
-    NOTE: Performing some extra global operations here.
-    - Integral constant
-    - Rescaling weights
-    - Squaring nodes
-    =#
-    @. weights = (2/pi)*weights*exp(nodes)
-    @. nodes = nodes^2
-
-    #krylov solver
-    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
-    if krylov_order == -1
-        krylov_order = dim
-    elseif krylov_order == -2
-        krylov_order = Int(ceil(log(dim)))
-    end
-
-    return SFNOptimizer(M, ϵ, linesearch, nodes, weights, solver, krylov_order, atol, rtol)
+    return SFNOptimizer(M, ϵ, solver, linesearch, atol, rtol)
 end
 
 #=
@@ -119,7 +92,12 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    Hv = LHvpOperator(H, x, power=1)
+    if typeof(opt.solver) == KrylovSolver
+        power = 2
+    else
+        power = 1
+    end
+    Hv = LHvpOperator(H, x, power=power)
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
@@ -177,12 +155,23 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
             break
         end
 
+        ##########
         #step
-        success = step!(opt, stats, x, f, grads, Hv, fval, g_norm, time_limit-time)
+
+        λ = opt.M*g_norm #+ opt.ϵ #compute regularization
+
+        step!(opt.solver, Hv, -grads, λ, time_limit-time)
+
+        success = true
+
+        if !isnothing(opt.linesearch)
+            success = search!(opt.linesearch, stats, x, opt.solver.p, f, fval, λ)
+        end
 
         if success == false
             break
         end
+        ##########
 
         #update function and gradient
         fval = fg!(grads, x)
@@ -203,90 +192,8 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     stats.converged = converged
     stats.iterations = iterations
     stats.f_evals += iterations+1
-    stats.hvp_evals = Hv.nProd
+    stats.hvp_evals = Hv.nprod
     stats.run_time = elapsed(tic)
 
     return stats
-end
-
-
-#=
-Computes an update step according to the shifted Lanczos-CG update rule.
-
-Input:
-    opt :: SFNOptimizer
-    x :: current iterate
-    f :: scalar valued function
-    grads :: function gradients
-    Hv :: hessian operator
-    g_norm :: gradient norm
-    linesearch:: whether to use linesearch
-=#
-function step!(opt::SFNOptimizer, stats::SFNStats, x::S, f::F, grads::S, Hv::H, fval::T, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F, H<:HvpOperator}
-    #compute regularization
-    λ = opt.M*g_norm #+ opt.ϵ
-    # println("Reg: ", λ)
-
-    #compute shifts
-    #NOTE: When the regularization is very large, these shifts are essentially the same
-    # shifts = opt.quad_nodes .+ λ
-
-    # shifts = opt.quad_nodes .+ 1e15
-    # shifts = opt.quad_nodes .+ 0.0
-    # shifts = 10.0 .^ (collect(-20.0:1.0:20.0))
-    # shifts = zero(opt.quad_nodes) .+ 1.0
-
-    # println(shifts)
-    # println(opt.quad_weights)
-
-    #compute CG Lanczos quadrature integrand ((tᵢ²+λₖ)I+Hₖ²)⁻¹gₖ
-    # cg_lanczos_shift!(opt.krylov_solver, Hv, -grads, shifts, itmax=opt.krylov_order, timemax=time_limit, skip=2)
-
-    #############################################
-    #craigmr
-    # p = zero(x)
-    # solver = CraigmrSolver(length(x), length(x), S)
-
-    # craigmr!(solver, Hv, grads, λ=sqrt(λ), timemax=time_limit)
-    # p .-= solver.y
-    # for i in eachindex(shifts)
-    #     craigmr!(solver, Hv, -grads, λ=sqrt(shifts[i]), itmax=opt.krylov_order, timemax=time_limit)
-    #     p .+= opt.quad_weights[i]*solver.y
-    # end
-    #############################################
-
-    # println(opt.krylov_solver.converged)
-    # println(opt.krylov_solver.stats.status)
-
-    #############################################
-    #eigendecomposition
-    p = zero(x)
-    E = eigen(Hermitian(Matrix(Hv.op)))
-    @. E.values = sqrt(E.values^2+λ)
-    mul!(p, inv(E), -grads)
-    push!(stats.krylov_iterations, 0)
-    #############################################
-
-    #
-    # push!(stats.krylov_iterations, opt.krylov_solver.stats.niter)
-
-    #evaluate integral and update
-    success = true
-
-    if isnothing(opt.linesearch)
-        @simd for i in eachindex(shifts)
-            @inbounds x .+= opt.quad_weights[i]*opt.krylov_solver.x[i]
-        end
-    else
-        # p = zero(x) #NOTE: Can we not allocate new space for this somehow?
-
-        # @simd for i in eachindex(shifts)
-        #     # @inbounds p .+= opt.quad_weights[i]*opt.krylov_solver.x[i]
-        #     @inbounds p .+= opt.quad_weights[i]*solver.y
-        # end
-        # println("Update norm: ", norm(p), '\n')
-        success = search!(opt.linesearch, stats, x, p, f, fval, λ)
-    end
-
-    return success
 end

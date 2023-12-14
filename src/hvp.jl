@@ -13,9 +13,16 @@ include("hvp/RdiffHvpExt.jl")
 include("hvp/ZygoteHvpExt.jl")
 
 #=
+Base and LinearAlgebra implementations for HvpOperator
+=#
+Base.adjoint(Hv::HvpOperator) = Hv
+LinearAlgebra.ishermitian(Hv::HvpOperator) = true
+LinearAlgebra.issymmetric(Hv::HvpOperator) = true
+
+#=
 In-place matrix vector multiplcation with HvpOperator
 
-WARNING: Default construction for Hv is power=2
+WARNING: Default construction for Hv is power=1
 
 Input:
 	result :: matvec storage
@@ -24,9 +31,8 @@ Input:
 =#
 function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
 	apply!(result, Hv, v)
-	# temp = similar(result)
+
 	@inbounds for i=1:Hv.power-1
-		# temp .= result
 		apply!(result, Hv, result) #NOTE: Is this okay reusing result like this?
 	end
 
@@ -38,7 +44,7 @@ In place update of RHvpOperator
 Input:
 =#
 function reset!(Hv::HvpOperator)
-	Hv.nProd = 0
+	Hv.nprod = 0
 
 	return nothing
 end
