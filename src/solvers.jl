@@ -74,7 +74,7 @@ end
 
 function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     # rank = Int(ceil(log(dim)))
-    rank = Int(ceil(sqrt(dim)))
+    rank = min(Int(ceil(sqrt(dim))), 30)
     
     return KrylovKitSolver(rank, type(undef, dim))
 end
