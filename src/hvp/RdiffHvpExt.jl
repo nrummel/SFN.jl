@@ -27,7 +27,7 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator
+mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator{T}
 	x::S
 	dualCache1::Vector{Dual{F, T, 1}}
 	dualCache2::Vector{Dual{F, T, 1}}
@@ -35,12 +35,6 @@ mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Intege
 	nprod::I
 	power::I
 end
-
-#=
-Base implementations for RHvpOperator
-=#
-Base.eltype(Hv::RHvpOperator{F, T, S}) where {F, T, S} = T
-Base.size(Hv::RHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
 In place update of RHvpOperator

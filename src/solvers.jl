@@ -7,7 +7,7 @@ SFN step solvers.
 using FastGaussQuadrature: gausslaguerre
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!
 using Arpack: eigs
-using LinearOperators: Matrix
+using KrylovKit: eigsolve
 
 #=
 Find search direction using shifted CG Lanczos
@@ -60,6 +60,33 @@ function step!(solver::KrylovSolver, Hv::H, b::S, λ::T, time_limit::T) where {T
     @simd for i in eachindex(shifts)
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
     end
+
+    return
+end
+
+#=
+Find search direction using low-rank eigendecomposition with Arpack
+=#
+mutable struct KrylovKitSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+    rank::I #
+    p::S #search direction
+end
+
+function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    # rank = Int(ceil(log(dim)))
+    rank = Int(ceil(sqrt(dim)))
+    
+    return KrylovKitSolver(rank, type(undef, dim))
+end
+
+function step!(solver::KrylovKitSolver, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    solver.p .= 0
+
+    D, V, info = eigsolve(Hv, solver.rank)
+
+    @. D = inv(sqrt(D^2+λ))
+    V = stack(V)
+    mul!(solver.p, V*Diagonal(D)*V', b) #not the fastest way to do this
 
     return
 end

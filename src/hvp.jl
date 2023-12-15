@@ -5,7 +5,9 @@ Associated functionality for matrix free Hessian vector multiplication operator
 using mixed mode AD.
 =#
 
-abstract type HvpOperator end
+import Base.*
+
+abstract type HvpOperator{T} <: AbstractMatrix{T} end
 
 include("hvp/EnzymeHvpExt.jl")
 include("hvp/LinopHvpExt.jl")
@@ -15,9 +17,26 @@ include("hvp/ZygoteHvpExt.jl")
 #=
 Base and LinearAlgebra implementations for HvpOperator
 =#
+Base.eltype(Hv::HvpOperator{T}) where {T} = T
+Base.size(Hv::HvpOperator) = (length(Hv.x), length(Hv.x))
 Base.adjoint(Hv::HvpOperator) = Hv
 LinearAlgebra.ishermitian(Hv::HvpOperator) = true
 LinearAlgebra.issymmetric(Hv::HvpOperator) = true
+
+#=
+Out of place matrix vector multiplcation with HvpOperator
+
+WARNING: Default construction for Hv is power=1
+
+Input:
+	Hv :: HvpOperator
+	v :: rhs vector
+=#
+function *(Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
+	res = similar(v)
+	mul!(res, Hv, v)
+	return res
+end
 
 #=
 In-place matrix vector multiplcation with HvpOperator

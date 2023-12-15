@@ -27,19 +27,13 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
+mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator{T}
 	f::F
 	x::S
 	dualCache1::AbstractVector{Dual{Nothing,T,1}}
-	nprod::Integer
-	power::Integer
+	nprod::I
+	power::I
 end
-
-#=
-Base implementations for ZHvpOperator
-=#
-Base.eltype(Hv::ZHvpOperator{F, T, S}) where {F, T, S} = T
-Base.size(Hv::ZHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
 Constructor.

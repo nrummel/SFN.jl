@@ -40,7 +40,7 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct EHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator
+mutable struct EHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}} <: HvpOperator{T}
     gf::F
     duplicated::Duplicated{S}
 	nprod::Integer
@@ -50,7 +50,6 @@ end
 #=
 Base implementations for EHvpOperator
 =#
-Base.eltype(Hv::EHvpOperator{F, T, S}) where {F, T, S} = T
 Base.size(Hv::EHvpOperator) = (size(Hv.duplicated.val, 1), size(Hv.duplicated.val, 1))
 
 #=

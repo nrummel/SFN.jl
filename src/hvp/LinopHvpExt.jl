@@ -12,19 +12,13 @@ export LHvpOperator
 #=
 
 =#
-mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer, L} <: HvpOperator
+mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer, L} <: HvpOperator{T}
     f::F
     x::S
     op::L
     nprod::I
     power::I
 end
-
-#=
-Base implementations for LHvpOperator
-=#
-Base.eltype(Hv::LHvpOperator{F, T, S, I, L}) where {F, T, S, I, L} = T
-Base.size(Hv::LHvpOperator) = (size(Hv.x,1), size(Hv.x,1))
 
 #=
 In place update of LHvpOperator
