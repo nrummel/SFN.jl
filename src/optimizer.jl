@@ -160,7 +160,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
         λ = opt.M*g_norm #+ opt.ϵ #compute regularization
 
-        step!(opt.solver, Hv, -grads, λ, time_limit-time)
+        step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
 
         success = true
 

@@ -50,12 +50,14 @@ function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, q
     return KrylovSolver(solver, krylov_order, nodes, weights, type(undef, dim))
 end
 
-function step!(solver::KrylovSolver, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
     
     shifts = solver.quad_nodes .+ λ
 
     cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
+
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     @simd for i in eachindex(shifts)
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
@@ -79,7 +81,7 @@ function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}
     return KrylovKitSolver(rank, type(undef, dim))
 end
 
-function step!(solver::KrylovKitSolver, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::KrylovKitSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
     D, V, info = eigsolve(Hv, solver.rank)
@@ -106,7 +108,7 @@ function ArpackSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) w
     return ArpackSolver(rank, type(undef, dim))
 end
 
-function step!(solver::ArpackSolver, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::ArpackSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
     D, V = eigs(Hv, nev=solver.rank, which=:LM, ritzvec=true)
@@ -131,7 +133,7 @@ function EigenSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) wh
     return EigenSolver(type(undef, dim))
 end
 
-function step!(solver::EigenSolver, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
     E = eigen(Hermitian(Matrix(Hv.op)))
