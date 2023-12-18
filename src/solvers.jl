@@ -57,6 +57,10 @@ function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
 
     cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
 
+    # if sum(solver.krylov_solver.converged) != length(shifts)
+    #     println("WARNING: Solver failure")
+    # end
+
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     @simd for i in eachindex(shifts)
@@ -76,7 +80,7 @@ end
 
 function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     # rank = Int(ceil(log(dim)))
-    rank = min(Int(ceil(sqrt(dim))), 30)
+    rank = min(Int(ceil(sqrt(dim))), 100)
     
     return KrylovKitSolver(rank, type(undef, dim))
 end
@@ -84,7 +88,7 @@ end
 function step!(solver::KrylovKitSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    D, V, info = eigsolve(Hv, solver.rank)
+    D, V, info = eigsolve(Hv, solver.rank, krylovdim=solver.rank)
 
     @. D = inv(sqrt(D^2+λ))
     V = stack(V)

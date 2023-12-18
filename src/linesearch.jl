@@ -123,3 +123,69 @@ function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, f
 
     return success
 end
+
+# function search!(searcher::SFNLineSearcher, stats::SFNStats, x::S, p::S, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+
+#     #exit status
+#     success = true
+    
+#     #increase step-size first
+#     if searcher.η >= 1.0
+#         searcher.η *= 2
+#         p .*= searcher.η
+#     else
+#         searcher.η = 1.0
+#     end
+
+#     #search direction norm
+#     p_norm = norm(p)
+
+#     if p_norm < eps(T)
+#         stats.status = "search direction too small"
+#         return false
+#     end
+    
+#     #target decrement
+#     dec = p_norm^2*sqrt(λ)*(1-3*sqrt(3))/6
+#     prev = Inf
+
+#     #NOTE: Can we just iteratively update x, is that even that much better?
+#     while true
+#         stats.f_evals += 1
+
+#         reduction = f(x+p)-fval
+
+#         println(reduction, " ", searcher.η)
+
+#         if reduction ≤ dec
+#             break
+#         elseif reduction > prev && prev < 0.0
+#             searcher.η /= searcher.α
+#             p ./= searcher.α
+#             break
+#         else
+#             searcher.η *= searcher.α #reduce step-size
+#             p .*= searcher.α #scale search direction
+#             dec *= searcher.α^2 #scale decrement
+#         end
+
+#         #check step-size
+#         if (searcher.η < eps(T)) || (isnan(searcher.η))
+#             if prev < 0.0
+#                 searcher.η /= searcher.α
+#                 p ./= searcher.α
+#                 break
+#             end
+
+#             success = false
+#             stats.status = "Linesearch failed"
+#             break
+#         end
+
+#         prev = reduction
+#     end
+
+#     x .+= p
+
+#     return success
+# end
