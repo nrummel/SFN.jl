@@ -4,20 +4,18 @@ Author: Cooper Simpson
 SFN optimizer.
 =#
 
-using FastGaussQuadrature: gausslaguerre
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!
 using Zygote: pullback
-
-using LinearOperators: Matrix
 
 #=
 SFN optimizer struct.
 =#
-mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S, LS}
+mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S}
     M::T1 #hessian lipschitz constant
     ϵ::T2 #regularization minimum
     solver::S #search direction solver
-    linesearch::LS #whether to use linsearch
+    linesearch::Bool #whether to use linsearch
+    η::T2 #step-size
+    α::T2 #linesearch factor
     atol::T2 #absolute gradient norm tolerance
     rtol::T2 #relative gradient norm tolerance
 end
@@ -29,24 +27,27 @@ NOTE: FGQ cant currently handle anything other than Float64
 
 Input:
     dim :: dimension of parameters
+    solver :: search direction solver
     M :: hessian lipschitz constant
     ϵ :: regularization minimum
     linsearch :: whether to use linesearch
+    η :: step-size in (0,1)
+    α :: linsearch factor in (0,1)
     atol :: absolute gradient norm tolerance
     rtol :: relative gradient norm tolerance
 =#
-function SFNOptimizer(dim::I, solver::Symbol; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::I, solver::Symbol; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
     #regularization
+    @assert (0≤M && 0≤ϵ)
+
     if linesearch
-        M = 1.0
-        linesearch = SFNLineSearcher()
-    else
-        linesearch = nothing
+        @assert (0<α && α<1)
+        @assert (0<η && η≤1)
     end
 
     solver = eval(solver)(dim)
 
-    return SFNOptimizer(M, ϵ, solver, linesearch, atol, rtol)
+    return SFNOptimizer(M, ϵ, solver, linesearch, η, α, atol, rtol)
 end
 
 #=
@@ -133,6 +134,23 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     fval = fg!(grads, x)
     g_norm = norm(grads)
 
+    #estimate regularization
+    if opt.linesearch
+        ζ = randn(length(x))
+        D = norm(ζ)^2
+
+        g2 = similar(grads)
+        fg!(g2, x+ζ)
+
+        mul!(ζ, Hv, ζ) 
+        ζ .= g2-grads-ζ
+
+        opt.M = norm(ζ)/(D)
+
+        g2 = nothing #mark for collection
+        println("Regularization estimate: ", opt.M)
+    end
+
     #compute tolerance
     tol = opt.atol + opt.rtol*g_norm
 
@@ -164,8 +182,8 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
         success = true
 
-        if !isnothing(opt.linesearch)
-            success = search!(opt.linesearch, stats, x, opt.solver.p, f, fval, λ)
+        if opt.linesearch
+            success = search!(opt, stats, x, opt.solver.p, f, fval, λ)
         end
 
         if success == false

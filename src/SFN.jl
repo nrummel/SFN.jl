@@ -15,8 +15,8 @@ export SFNOptimizer, minimize!
 include("stats.jl")
 include("hvp.jl")
 include("solvers.jl")
-include("linesearch.jl")
 include("optimizer.jl")
+include("linesearch.jl")
 
 #=
 If optional packages are loaded then export compatible functions.
