@@ -116,7 +116,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
     p_norm = norm(p)
 
     if p_norm < eps(T)
-        stats.status = "Search direction too small"
+        stats.status = "search direction too small"
         return false
     end
     
@@ -138,7 +138,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
         #check step-size
         if η < eps(T)
             success = false
-            stats.status = "Linesearch failed"
+            stats.status = "linesearch failed"
             break
         end
     end

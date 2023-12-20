@@ -148,7 +148,6 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         opt.M = norm(ζ)/(D)
 
         g2 = nothing #mark for collection
-        println("Regularization estimate: ", opt.M)
     end
 
     #compute tolerance
