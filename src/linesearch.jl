@@ -144,7 +144,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
     end
 
     #update regularization
-    opt.M = 1/η^2
+    opt.M = min(1e15, 1/η^2)
 
     #update iterate
     x .+= p

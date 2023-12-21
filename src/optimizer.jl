@@ -145,7 +145,8 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         mul!(ζ, Hv, ζ) 
         ζ .= g2-grads-ζ
 
-        opt.M = norm(ζ)/(D)
+        opt.M = min(1e15, norm(ζ)/(D))
+        # println("M Estimate: ", opt.M)
 
         g2 = nothing #mark for collection
     end
