@@ -128,6 +128,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
         stats.f_evals += 1
 
         if f(x+p)-fval ≤ dec
+            # println("Reduction: ", f(x+p)-fval)
             break
         else
             η *= opt.α #reduce step-size
@@ -144,7 +145,9 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
     end
 
     #update regularization
+    # println("η: ", η)
     opt.M = min(1e15, 1/η^2)
+    # println("M: ", opt.M)
 
     #update iterate
     x .+= p
@@ -183,6 +186,7 @@ end
 
 #         # if f(x+p)-fval ≤ dec
 #         if (f_next-fval ≤ dec1) || (norm(g_next) ≤ dec2)
+#             println("Reduction: ", f_next-fval)
 #             break
 #         else
 #             η *= opt.α #reduce step-size
@@ -200,7 +204,8 @@ end
 #     end
 
 #     #update regularization
-#     opt.M = 1/η^2
+#     opt.M = min(1e15, 1/η^2)
+#     println("M: ", opt.M)
 
 #     #update iterate
 #     x .+= p

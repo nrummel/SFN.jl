@@ -62,7 +62,12 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #setup hvp operator
-    Hv = RHvpOperator(f, x)
+    if typeof(opt.solver) <: KrylovSolver
+        power = 2
+    else
+        power = 1
+    end
+    Hv = RHvpOperator(f, x, power=power)
 
     #
     function fg!(grads::S, x::S)
@@ -93,7 +98,7 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    if typeof(opt.solver) == KrylovSolver
+    if typeof(opt.solver) <: KrylovSolver
         power = 2
     else
         power = 1
@@ -161,6 +166,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     #iterate
     while iterations<itmax+1
         #check gradient norm
+        # println("$g_norm ?< $tol")
         if g_norm <= tol
             converged = true
             break
@@ -184,6 +190,8 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
         if opt.linesearch
             success = search!(opt, stats, x, opt.solver.p, f, fval, λ)
+        else
+            x .+= opt.solver.p
         end
 
         if success == false
