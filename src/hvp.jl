@@ -24,6 +24,24 @@ LinearAlgebra.ishermitian(Hv::HvpOperator) = true
 LinearAlgebra.issymmetric(Hv::HvpOperator) = true
 
 #=
+Form full matrix
+=#
+function Base.Matrix(Hv::HvpOperator{T}) where {T}
+	n = size(Hv)[1]
+	mat = Matrix{T}(undef, n, n)
+
+	ei = zeros(T, n)
+
+	@inbounds for i = 1:n
+		ei[i] = one(T)
+		mul!(A[:,i], Hv, ei)
+		ei[i] = zero(T)
+	end
+
+	return Hermitian(mat)
+end
+
+#=
 Out of place matrix vector multiplcation with HvpOperator
 
 WARNING: Default construction for Hv is power=1

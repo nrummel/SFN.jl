@@ -20,7 +20,7 @@ mutable struct KrylovSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     p::S #search direction
 end
 
-function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=31, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
@@ -127,7 +127,7 @@ function step!(solver::ArpackSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
 end
 
 #=
-Find search direction using low-rank eigendecomposition with Arpack
+Find search direction using full eigendecomposition
 =#
 mutable struct EigenSolver{T<:AbstractFloat, S<:AbstractVector{T}}
     p::S #search direction
@@ -140,7 +140,7 @@ end
 function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    E = eigen(Hermitian(Matrix(Hv.op)))
+    E = eigen(Matrix(Hv.op))
 
     @. E.values = sqrt(E.values^2+λ)
     mul!(solver.p, inv(E), b)
