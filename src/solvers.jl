@@ -80,7 +80,8 @@ end
 
 function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     # rank = Int(ceil(log(dim)))
-    rank = min(Int(ceil(sqrt(dim))), 100)
+    # rank = min(Int(ceil(sqrt(dim))), 100)
+    rank = min(dim, 100)
     
     return KrylovKitSolver(rank, type(undef, dim))
 end
@@ -140,7 +141,7 @@ end
 function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    E = eigen(Matrix(Hv.op))
+    E = eigen(Matrix(Hv))
 
     @. E.values = sqrt(E.values^2+λ)
     mul!(solver.p, inv(E), b)
