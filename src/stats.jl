@@ -4,6 +4,8 @@ Author: Cooper Simpson
 SFN optimizer stats
 =#
 
+using Statistics: mean
+
 mutable struct SFNStats{I<:Integer, S1<:Vector{<:AbstractFloat}}
     converged::Bool #whether optimizer has converged
     iterations::I #number of optimizer iterations
@@ -23,6 +25,17 @@ Input
 =#
 function SFNStats(type::Type{<:AbstractFloat})
     return SFNStats(false, 0, 0, 0, 0.0, type[], type[], type[], "")
+end
+
+function Base.show(io::IO, stats::SFNStats)
+    print(io, "Converged: ", stats.converged, '\n',
+                "Iterations: ", stats.iterations, '\n',
+                "Function Evals: ", stats.f_evals, '\n',
+                "Hvp Evals: ", stats.hvp_evals, '\n',
+                "Run Time (s): ", stats.run_time, '\n',
+                "Minimum: ", stats.f_seq[end], '\n',
+                "Avg. Krylov Iterations: ", mean(stats.krylov_iterations), '\n',
+                "Status: ", stats.status, '\n')
 end
 
 #=

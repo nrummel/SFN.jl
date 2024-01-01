@@ -7,7 +7,7 @@ SFN step solvers.
 using FastGaussQuadrature: gausslaguerre
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!
 using Arpack: eigs
-using KrylovKit: eigsolve
+using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 
 #=
 Find search direction using shifted CG Lanczos
@@ -75,21 +75,26 @@ Find search direction using low-rank eigendecomposition with Arpack
 =#
 mutable struct KrylovKitSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     rank::I #
+    krylov_solver::Lanczos #
     p::S #search direction
 end
 
 function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    # rank = Int(ceil(log(dim)))
-    # rank = min(Int(ceil(sqrt(dim))), 100)
-    rank = min(dim, 100)
+    rank = Int(ceil(log(dim)))
+    # rank = Int(ceil(sqrt(dim)))
+    # rank = min(dim, 100)
+
+    krylov_solver = Lanczos(krylovdim=dim, maxiter=KrylovDefaults.maxiter, tol=1e-6, orth=KrylovDefaults.orth, eager=false, verbosity=0)
     
-    return KrylovKitSolver(rank, type(undef, dim))
+    return KrylovKitSolver(rank, krylov_solver, type(undef, dim))
 end
 
 function step!(solver::KrylovKitSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    D, V, info = eigsolve(Hv, solver.rank, krylovdim=solver.rank)
+    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
+
+    push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
 
     @. D = inv(sqrt(D^2+λ))
     V = stack(V)
