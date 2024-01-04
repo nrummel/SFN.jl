@@ -110,7 +110,10 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
     success = true
     
     #increase step-size first
-    η = 1.0
+    η = 2.0
+
+    #scale search direction
+    p .*= η
 
     #search direction norm
     p_norm = norm(p)
@@ -146,7 +149,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
 
     #update regularization
     # println("η: ", η)
-    opt.M = min(1e15, 1/η^2)
+    opt.M = min(1e15, opt.M/η^2)
     # println("M: ", opt.M)
 
     #update iterate

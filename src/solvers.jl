@@ -73,7 +73,7 @@ end
 #=
 Find search direction using low-rank eigendecomposition with Arpack
 =#
-mutable struct KrylovKitSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+mutable struct KrylovKitSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     rank::I #
     krylov_solver::Lanczos #
     p::S #search direction
@@ -150,6 +150,39 @@ function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_li
 
     @. E.values = sqrt(E.values^2+λ)
     mul!(solver.p, inv(E), b)
+
+    return
+end
+
+#=
+Find search direction using full eigendecomposition
+=#
+mutable struct NystromSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+    k::I #rank
+    s::I #sketch size
+    p::S #search direction
+end
+
+function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    return NystromSolver(type(undef, dim))
+end
+
+function step!(solver::NystromSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    solver.p .= 0
+
+    X = randn(length(b), solver.s)
+
+    C = Hv*X #compute sketch, nxs
+
+    V, Λ = eigen(hermitian(X'*C)) #sxs, sxs
+    Q, R = qr(C) #nxs, sxs #NOTE: This isn't thin which is an issue
+
+    V, Λ = eigen(hermitian(R*V[:,:r]*pinv(Diagonal(Λ[:r]))*V[:,:r]'*R')) #sxr, rxr
+
+    V = Q*V #nxr
+    Λ = Diagonal(inv(sqrt(Λ^2+λ))) #rxr
+
+    mul!(solver.p, V*Λ*V', b)
 
     return
 end
