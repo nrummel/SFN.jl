@@ -4,10 +4,13 @@ Author: Cooper Simpson
 SFN step solvers.
 =#
 
-using FastGaussQuadrature: gausslaguerre
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!
+using FastGaussQuadrature: gausslaguerre, gausschebyshevt
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!, CgLanczosShaleSolver, cg_lanczos_shale!
 using Arpack: eigs
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
+using RandomizedPreconditioners: NystromSketch, NystromPreconditionerInverse
+
+########################################################
 
 #=
 Find search direction using shifted CG Lanczos
@@ -55,7 +58,7 @@ function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
     
     shifts = solver.quad_nodes .+ λ
 
-    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit, skip=2)
 
     # if sum(solver.krylov_solver.converged) != length(shifts)
     #     println("WARNING: Solver failure")
@@ -69,6 +72,63 @@ function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
 
     return
 end
+
+########################################################
+
+#=
+Find search direction using shifted CG Lanczos
+=#
+mutable struct ShaleSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+    krylov_solver::CgLanczosShaleSolver #krylov inverse mat vec solver
+    krylov_order::I #maximum Krylov subspace size
+    quad_nodes::S #quadrature nodes
+    quad_weights::S #quadrature weights
+    p::S #search direction
+end
+
+function ShaleSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+
+    #quadrature
+    nodes, weights = gausschebyshevt(quad_order)
+    @. weights *= 2/pi #global scaling
+
+    #krylov solver
+    solver = CgLanczosShaleSolver(dim, dim, quad_order, type)
+    if krylov_order == -1
+        krylov_order = dim
+    elseif krylov_order == -2
+        krylov_order = Int(ceil(log(dim)))
+    end
+
+    return ShaleSolver(solver, krylov_order, nodes, weights, type(undef, dim))
+end
+
+function step!(solver::ShaleSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    solver.p .= 0
+
+    β = 1. #NOTE: This could be set to some good estimate for where eigenvalues of Hv are clustered
+
+    shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
+    scales = solver.quad_nodes .+ 1
+
+    cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, skip=2)
+
+    if sum(solver.krylov_solver.converged) != length(scales)
+        println("WARNING: Solver failure")
+    end
+
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+
+    @simd for i in eachindex(scales)
+        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
+    end
+
+    # @. solver.p *= sqrt(β)
+
+    return
+end
+
+########################################################
 
 #=
 Find search direction using low-rank eigendecomposition with Arpack
@@ -103,6 +163,8 @@ function step!(solver::KrylovKitSolver, stats::SFNStats, Hv::H, b::S, λ::T, tim
     return
 end
 
+########################################################
+
 #=
 Find search direction using low-rank eigendecomposition with Arpack
 =#
@@ -132,6 +194,8 @@ function step!(solver::ArpackSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
     return
 end
 
+########################################################
+
 #=
 Find search direction using full eigendecomposition
 =#
@@ -154,35 +218,135 @@ function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_li
     return
 end
 
+########################################################
+
 #=
 Find search direction using full eigendecomposition
 =#
 mutable struct NystromSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     k::I #rank
-    s::I #sketch size
+    r::I #sketch size
+    krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
+    krylov_order::I #maximum Krylov subspace size
+    quad_nodes::S #quadrature nodes
+    quad_weights::S #quadrature weights
     p::S #search direction
 end
 
-function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    return NystromSolver(type(undef, dim))
+function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+    #quadrature
+    nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
+
+    if length(nodes) < quad_order
+        quad_order = length(nodes)
+        println("Quadrature weight precision reached, using $(quad_order) quadrature locations.")
+    end
+
+    #=
+    NOTE: Performing some extra global operations here.
+    - Integral constant
+    - Rescaling weights
+    - Squaring nodes
+    =#
+    @. weights = (2/pi)*weights*exp(nodes)
+    @. nodes = nodes^2
+
+    #krylov solver
+    solver = CgLanczosShiftSolver(dim, dim, quad_order, type)
+    if krylov_order == -1
+        krylov_order = dim
+    elseif krylov_order == -2
+        krylov_order = Int(ceil(log(dim)))
+    end
+
+    #nystrom rank
+    k = Int(ceil(log(dim)))
+    r = Int(ceil(1.5*k))
+
+    return NystromSolver(k, r, solver, krylov_order, nodes, weights, type(undef, dim))
 end
 
 function step!(solver::NystromSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    X = randn(length(b), solver.s)
+    A = Matrix(Hv.op)
+    A = A*A
 
-    C = Hv*X #compute sketch, nxs
+    # println(A)
 
-    V, Λ = eigen(hermitian(X'*C)) #sxs, sxs
-    Q, R = qr(C) #nxs, sxs #NOTE: This isn't thin which is an issue
+    # P = nystrom(A, solver.k, solver.r, λ)
+    Pinv = NystromPreconditionerInverse(NystromSketch(A, solver.k, solver.r), λ)
 
-    V, Λ = eigen(hermitian(R*V[:,:r]*pinv(Diagonal(Λ[:r]))*V[:,:r]'*R')) #sxr, rxr
+    # println(Matrix(Pinv))
 
-    V = Q*V #nxr
-    Λ = Diagonal(inv(sqrt(Λ^2+λ))) #rxr
+    cg_lanczos_shift!(solver.krylov_solver, A+λ*I, b, solver.quad_nodes, M=Pinv, ldiv=false, itmax=solver.krylov_order, timemax=time_limit)
 
-    mul!(solver.p, V*Λ*V', b)
+    # if sum(solver.krylov_solver.converged) != length(shifts)
+    #     println("WARNING: Solver failure")
+    # end
+
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+
+    @simd for i in eachindex(solver.quad_nodes)
+        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
+    end
+
+    return
+end
+
+########################################################
+
+#=
+Find search direction using CRAIGMR
+=#
+mutable struct CraigSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+    krylov_solver::CraigmrSolver #krylov inverse mat vec solver
+    krylov_order::I #maximum Krylov subspace size
+    quad_nodes::S #quadrature nodes
+    quad_weights::S #quadrature weights
+    p::S #search direction
+end
+
+function CraigSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+
+    #quadrature
+    nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
+
+    if length(nodes) < quad_order
+        quad_order = length(nodes)
+        println("Quadrature weight precision reached, using $(quad_order) quadrature locations.")
+    end
+
+    #=
+    NOTE: Performing some extra global operations here.
+    - Integral constant
+    - Rescaling weights
+    - Squaring nodes
+    =#
+    @. weights = (2/pi)*weights*exp(nodes)
+    @. nodes = nodes^2
+
+    #krylov solver
+    solver = CraigmrSolver(dim, dim, type)
+    if krylov_order == -1
+        krylov_order = dim
+    elseif krylov_order == -2
+        krylov_order = Int(ceil(log(dim)))
+    end
+
+    return CraigSolver(solver, krylov_order, nodes, weights, type(undef, dim))
+end
+
+function step!(solver::CraigSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    solver.p .= 0
+    
+    shifts = sqrt.(solver.quad_nodes .+ λ)
+
+    @inbounds for i in eachindex(shifts)
+        craigmr!(solver.krylov_solver, Hv, b, λ=shifts[i], itmax=solver.krylov_order, timemax=time_limit)
+
+        solver.p .+= solver.quad_weights[i]*solver.krylov_solver.y
+    end
 
     return
 end

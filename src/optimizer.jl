@@ -98,8 +98,10 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    if typeof(opt.solver) <: KrylovSolver
+    if (typeof(opt.solver) <: Union{KrylovSolver, NystromSolver})
         power = 2
+    elseif (typeof(opt.solver) <: ShaleSolver)
+        power = 1
     else
         power = 1
     end
@@ -155,6 +157,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
             opt.M = min(1e15, 2*norm(ζ)/(D))
         end
+        # println("M: ", opt.M)
 
         g2 = nothing #mark for collection
     end
