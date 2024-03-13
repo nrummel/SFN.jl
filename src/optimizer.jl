@@ -4,7 +4,8 @@ Author: Cooper Simpson
 SFN optimizer.
 =#
 
-using Zygote: pullback
+# using Zygote: pullback
+using Enzyme: ReverseWithPrimal
 
 #=
 SFN optimizer struct.
@@ -36,7 +37,7 @@ Input:
     atol :: absolute gradient norm tolerance
     rtol :: relative gradient norm tolerance
 =#
-function SFNOptimizer(dim::I, solver::Symbol; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
     #regularization
     @assert (0≤M && 0≤ϵ)
 
@@ -67,13 +68,21 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=
     else
         power = 1
     end
-    Hv = RHvpOperator(f, x, power=power)
+    Hv = EHvpOperator(f, x, power=power)
 
-    #
-    function fg!(grads::S, x::S)
+    #OLD: Using Zygote
+    # function fg!(grads::S, x::S)
         
-        fval, back = let f=f; pullback(f, x) end
-        grads .= back(one(fval))[1]
+    #     fval, back = let f=f; pullback(f, x) end
+    #     grads .= back(one(fval))[1]
+
+    #     return fval
+    # end
+
+    #NEW: Using Enzyme
+    function fg!(grads::S, x::S)
+
+        _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
 
         return fval
     end
@@ -98,9 +107,11 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    if (typeof(opt.solver) <: Union{KrylovSolver, NystromSolver})
+    if (typeof(opt.solver) <: KrylovSolver)
         power = 2
     elseif (typeof(opt.solver) <: ShaleSolver)
+        power = 1
+    elseif (typeof(opt.solver) <: CraigSolver)
         power = 1
     else
         power = 1
@@ -157,7 +168,8 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
             opt.M = min(1e15, 2*norm(ζ)/(D))
         end
-        # println("M: ", opt.M)
+
+        # println("Estimated M: ", opt.M, '\n')
 
         g2 = nothing #mark for collection
     end
@@ -188,7 +200,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         ##########
         #step
 
-        λ = opt.M*g_norm #+ opt.ϵ #compute regularization
+        λ = min(1e15, opt.M*g_norm) #+ opt.ϵ #compute regularization
 
         step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
 

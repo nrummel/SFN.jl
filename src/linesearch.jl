@@ -15,7 +15,7 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
+function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S1<:AbstractVector{T}, S2<:AbstractVector{T}}
 
     # println("Reg: ", λ)
 
@@ -61,9 +61,9 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S, p::S, f::F, fval::T, 
     end
 
     #update regularization
-    # println("η: ", η)
+    # println("Accepted η: ", η)
     opt.M = max(min(1e15, opt.M/η^2), 1e-15)
-    # println("M: ", opt.M)
+    # println("Updated M: ", opt.M)
 
     #update iterate
     x .+= p

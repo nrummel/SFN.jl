@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -22,7 +23,6 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 
 [extensions]
-FluxExt = "Flux"
 
 [extras]
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"

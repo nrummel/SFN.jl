@@ -5,7 +5,7 @@ Enzyme AD.
 =#
 
 using SFN: HvpOperator
-using Enzyme: autodiff, autodiff_deferred, Forward, Reverse, Duplicated
+using Enzyme: autodiff, autodiff_deferred, Forward, Reverse, Active, Const, Duplicated, DuplicatedNoNeed
 
 export ehvp, EHvpOperator
 
@@ -22,16 +22,11 @@ function ehvp(f::F, x::S, v::S) where {F, T<:AbstractFloat, S<:AbstractVector{T}
     bx = similar(x)
     dbx = similar(x)
 
-    y = zero(T)
-    dy = zero(T)
-    by = one(T)
-    dby = zero(T)
-
     autodiff(
         Forward,
-        (x,y) -> autodiff_deferred(Reverse, f, x, y),
-        Duplicated(Duplicated(x, bx), Duplicated(v, dbx)),
-        Duplicated(Duplicated(y, by), Duplicated(dy, dby))
+        x -> autodiff_deferred(Reverse, f, Active, x),
+        Const,
+        DuplicatedNoNeed(Duplicated(x, bx), Duplicated(v, dbx))
     )
 
     return dbx
@@ -50,7 +45,11 @@ end
 #=
 Base implementations for EHvpOperator
 =#
-Base.size(Hv::EHvpOperator) = (size(Hv.duplicated.val, 1), size(Hv.duplicated.val, 1))
+function Base.size(Hv::EHvpOperator)
+    n = size(Hv.duplicated.val, 1)
+    
+    return (n,n)
+end
 
 #=
 In place update of EHvpOperator
@@ -58,7 +57,8 @@ Input:
 	x :: new input to f
 =#
 function update!(Hv::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
-	Hv.duplicated = Duplicated(x, similar(x))
+    # Hv.duplicated.val .= x
+    Hv.duplicated = Duplicated(x, similar(x))
 
 	return nothing
 end
@@ -71,7 +71,7 @@ Input:
 	x :: input to f
 =#
 function EHvpOperator(f::F, x::S; power::Integer=1) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
-    gf = x -> autodiff_deferred(f, x)
+    gf = x -> autodiff_deferred(Reverse, f, Active, x)
 
 	return EHvpOperator(gf, Duplicated(x, similar(x)), 0, power)
 end
@@ -90,7 +90,8 @@ function apply!(result::S, Hv::EHvpOperator, v::S) where S<:AbstractVector{<:Abs
     autodiff(
         Forward,
         Hv.gf,
-        Duplicated(Hv.duplicated, Duplicated(v, result))
+        Const,
+        DuplicatedNoNeed(Hv.duplicated, Duplicated(v, result))
     )
 
 	return nothing

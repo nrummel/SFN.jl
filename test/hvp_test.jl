@@ -17,16 +17,15 @@ if run_all || "hvp" in ARGS
         #hvp problem setup
         x = randn(n)
         v = randn(n)
-        single = (A+A')*v
-        double = (A+A')*single
+        product = (A+A')*v
 
         #=
         Test basic hvp function
         =#
         @testset "basic hvp" begin
-            @test ehvp(f, x, v) ≈ single
-            @test zhvp(f, x, v) ≈ single
-            @test rhvp(f, x, v) ≈ single
+            @test ehvp(f, x, v) ≈ product
+            @test zhvp(f, x, v) ≈ product
+            @test rhvp(f, x, v) ≈ product
         end
 
         #=
@@ -42,8 +41,8 @@ if run_all || "hvp" in ARGS
 
                 @test eltype(Hv) == eltype(x)
                 @test size(Hv) == (n, n)
-                @test result ≈ double
-                @test Hv.nProd == 2
+                @test result ≈ product
+                @test Hv.nprod == 1
             end
 
             @testset "reversediff" begin
@@ -52,8 +51,8 @@ if run_all || "hvp" in ARGS
 
                 @test eltype(Hv) == eltype(x)
                 @test size(Hv) == (n, n)
-                @test result ≈ double
-                @test Hv.nProd == 2
+                @test result ≈ product
+                @test Hv.nprod == 1
             end
 
             @testset "zygote" begin
@@ -62,8 +61,8 @@ if run_all || "hvp" in ARGS
 
                 @test eltype(Hv) == eltype(x)
                 @test size(Hv) == (n, n)
-                @test result ≈ double
-                @test Hv.nProd == 2
+                @test result ≈ product
+                @test Hv.nprod == 1
             end
         end
     end

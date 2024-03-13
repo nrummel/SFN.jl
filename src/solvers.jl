@@ -50,15 +50,15 @@ function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, q
         krylov_order = Int(ceil(log(dim)))
     end
 
-    return KrylovSolver(solver, krylov_order, nodes, weights, type(undef, dim))
+    return KrylovSolver(solver, krylov_order, T.(nodes), T.(weights), type(undef, dim))
 end
 
-function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
     solver.p .= 0
     
     shifts = solver.quad_nodes .+ λ
 
-    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit, skip=2)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
 
     # if sum(solver.krylov_solver.converged) != length(shifts)
     #     println("WARNING: Solver failure")
@@ -111,7 +111,22 @@ function step!(solver::ShaleSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_li
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
     scales = solver.quad_nodes .+ 1
 
-    cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, skip=2)
+    ####
+    # Λ, V = eigen(Hermitian(Matrix(Hv.op))) #eigen decomp of H
+    # Λ = Diagonal(inv.(abs.(Λ))) #rank-k |H|^-1
+
+    # P = V*Λ*V'
+    ####
+
+    ###
+    # D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), 3, :LM)
+
+    # @. D = inv(sqrt(D))
+    # V = stack(V)
+    # P = V*Diagonal(D)*V'
+    ###
+
+    cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit)
 
     if sum(solver.krylov_solver.converged) != length(scales)
         println("WARNING: Solver failure")
@@ -140,8 +155,8 @@ mutable struct KrylovKitSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T
 end
 
 function KrylovKitSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    rank = Int(ceil(log(dim)))
-    # rank = Int(ceil(sqrt(dim)))
+    # rank = Int(ceil(log(dim)))
+    rank = Int(ceil(sqrt(dim)))
     # rank = min(dim, 100)
 
     krylov_solver = Lanczos(krylovdim=dim, maxiter=KrylovDefaults.maxiter, tol=1e-6, orth=KrylovDefaults.orth, eager=false, verbosity=0)
@@ -269,17 +284,19 @@ end
 function step!(solver::NystromSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    A = Matrix(Hv.op)
-    A = A*A
+    shifts = solver.quad_nodes .+ λ
+
+    # A = Matrix(Hv.op)
+    # A = A*A
 
     # println(A)
 
     # P = nystrom(A, solver.k, solver.r, λ)
-    Pinv = NystromPreconditionerInverse(NystromSketch(A, solver.k, solver.r), λ)
+    Pinv = NystromPreconditionerInverse(NystromSketch(Hv, solver.k, solver.r), 0)
 
     # println(Matrix(Pinv))
 
-    cg_lanczos_shift!(solver.krylov_solver, A+λ*I, b, solver.quad_nodes, M=Pinv, ldiv=false, itmax=solver.krylov_order, timemax=time_limit)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, M=Pinv, ldiv=false, itmax=solver.krylov_order, timemax=time_limit)
 
     # if sum(solver.krylov_solver.converged) != length(shifts)
     #     println("WARNING: Solver failure")
@@ -342,10 +359,18 @@ function step!(solver::CraigSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_li
     
     shifts = sqrt.(solver.quad_nodes .+ λ)
 
+    solved = true
+
     @inbounds for i in eachindex(shifts)
         craigmr!(solver.krylov_solver, Hv, b, λ=shifts[i], itmax=solver.krylov_order, timemax=time_limit)
 
+        solved = solved && solver.krylov_solver.stats.solved
+
         solver.p .+= solver.quad_weights[i]*solver.krylov_solver.y
+    end
+
+    if solved == false
+        println("WARNING: Solver failure")
     end
 
     return

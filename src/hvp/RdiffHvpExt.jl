@@ -27,10 +27,10 @@ end
 #=
 In-place hvp operator compatible with Krylov.jl
 =#
-mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator{T}
+mutable struct RHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, S2<:AbstractVector{Dual{F, T, 1}}, I<:Integer} <: HvpOperator{T}
 	x::S
-	dualCache1::Vector{Dual{F, T, 1}}
-	dualCache2::Vector{Dual{F, T, 1}}
+	dualCache1::S2
+	dualCache2::S2
 	tape::AbstractTape
 	nprod::I
 	power::I

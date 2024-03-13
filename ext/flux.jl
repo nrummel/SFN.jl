@@ -3,7 +3,7 @@ Author: Cooper Simpson
 
 All functionality to interact with Flux.jl and support SFN optimizer
 =#
-
+#= NOTE: COMMENTING OUT FOR NOW
 module FluxExt
 
 using SFN: SFNOptimizer, HvpOperator
@@ -112,3 +112,4 @@ function make_flat(model::M, dim::Int, type::Type{AbstractVector{T}}) where {T<:
 end
 
 end #module
+=#

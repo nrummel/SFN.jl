@@ -34,9 +34,9 @@ if run_all || "optimizer" in ARGS
             dim = rand(2:100)
             x = rand(dim)
 
-            opt = SFNOptimizer(size(x,1))
+            opt = SFNOptimizer(size(x,1), linesearch=true)
 
-            @test_nowarn minimize!(opt, x, rosenbrock, itmax=1, linesearch=true)
+            @test_nowarn minimize!(opt, x, rosenbrock, itmax=1)
         end
     end
 end
