@@ -169,7 +169,7 @@ function step!(solver::KrylovKitSolver, stats::SFNStats, Hv::H, b::S, λ::T, tim
 
     D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
 
-    push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
+    # push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
 
     @. D = inv(sqrt(D^2+λ))
     V = stack(V)
@@ -225,7 +225,10 @@ end
 function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    E = eigen(Matrix(Hv))
+    # E = eigen(Matrix(Hv)) #NOTE: FAILS OFTEN, Using custom Matrix function should be same as LinearOperator.jl
+    E = eigen(Matrix(Hv.op)) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
+
+    Hv.nprod += length(b)
 
     @. E.values = sqrt(E.values^2+λ)
     mul!(solver.p, inv(E), b)
