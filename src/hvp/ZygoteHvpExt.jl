@@ -36,6 +36,26 @@ mutable struct ZHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Intege
 end
 
 #=
+Base implementations for ZHvpOperator
+=#
+function Base.size(Hv::ZHvpOperator)
+    n = size(Hv.x, 1)
+    
+    return (n,n)
+end
+
+#=
+In place update of ZHvpOperator
+Input:
+	x :: new input to f
+=#
+function update!(Hv::ZHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
+    Hv.x .= x
+
+	return nothing
+end
+
+#=
 Constructor.
 
 Input:

@@ -24,6 +24,16 @@ LinearAlgebra.ishermitian(Hv::HvpOperator) = true
 LinearAlgebra.issymmetric(Hv::HvpOperator) = true
 
 #=
+In place update of RHvpOperator
+Input:
+=#
+function reset!(Hv::HvpOperator)
+	Hv.nprod = 0
+
+	return nothing
+end
+
+#=
 Form full matrix
 =#
 function Base.Matrix(Hv::HvpOperator{T}) where {T}
@@ -77,11 +87,19 @@ function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:A
 end
 
 #=
-In place update of RHvpOperator
+In-place matrix-matrix multiplcation with HvpOperator
+
+WARNING: Default construction for Hv is power=1
+
 Input:
+	result :: matvec storage
+	Hv :: HvpOperator
+	v :: rhs vector
 =#
-function reset!(Hv::HvpOperator)
-	Hv.nprod = 0
+function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:Matrix{<:AbstractFloat}, H<:HvpOperator}
+	for i=1:range(size(V,2))
+		@views mul!(result[:,i], Hv, V[:,i])
+	end
 
 	return nothing
 end

@@ -10,7 +10,7 @@ Setup
 =#
 using LinearAlgebra
 
-export SFNOptimizer, minimize!
+export SFNOptimizer, minimize!, update!
 
 include("stats.jl")
 include("hvp.jl")

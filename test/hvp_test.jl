@@ -34,6 +34,7 @@ if run_all || "hvp" in ARGS
         @testset "hvp operator" begin
 
             result = similar(v)
+            ϵ = randn(n)
 
             @testset "enzyme" begin
                 Hv = EHvpOperator(f, x)
@@ -43,6 +44,10 @@ if run_all || "hvp" in ARGS
                 @test size(Hv) == (n, n)
                 @test result ≈ product
                 @test Hv.nprod == 1
+
+                update!(Hv, x+ϵ)
+                LA.mul!(result, Hv, v)
+                @test result ≈ product
             end
 
             @testset "reversediff" begin
@@ -53,6 +58,10 @@ if run_all || "hvp" in ARGS
                 @test size(Hv) == (n, n)
                 @test result ≈ product
                 @test Hv.nprod == 1
+
+                update!(Hv, x+ϵ)
+                LA.mul!(result, Hv, v)
+                @test result ≈ product
             end
 
             @testset "zygote" begin
@@ -63,6 +72,10 @@ if run_all || "hvp" in ARGS
                 @test size(Hv) == (n, n)
                 @test result ≈ product
                 @test Hv.nprod == 1
+
+                update!(Hv, x+ϵ)
+                LA.mul!(result, Hv, v)
+                @test result ≈ product
             end
         end
     end

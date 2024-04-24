@@ -6,6 +6,8 @@ SFN optimizer stats
 
 using Statistics: mean
 
+export SFNStats
+
 mutable struct SFNStats{I<:Integer, S1<:Vector{<:AbstractFloat}}
     converged::Bool #whether optimizer has converged
     iterations::I #number of optimizer iterations

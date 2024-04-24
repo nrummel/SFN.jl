@@ -4,7 +4,7 @@ Author: Cooper Simpson
 SFN optimizer.
 =#
 
-# using Zygote: pullback
+using Zygote: pullback
 using Enzyme: ReverseWithPrimal
 
 #=
@@ -63,29 +63,33 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #setup hvp operator
-    if typeof(opt.solver) <: KrylovSolver
+    if (typeof(opt.solver) <: GLKSolver)
+        power = 2
+    elseif typeof(opt.solver) <: KrylovSolver
+        power = 1
+    elseif typeof(opt.solver) <: NystromDefiniteSolver
         power = 2
     else
         power = 1
     end
-    Hv = EHvpOperator(f, x, power=power)
+    Hv = RHvpOperator(f, x, power=power)
 
     #OLD: Using Zygote
-    # function fg!(grads::S, x::S)
-        
-    #     fval, back = let f=f; pullback(f, x) end
-    #     grads .= back(one(fval))[1]
-
-    #     return fval
-    # end
-
-    #NEW: Using Enzyme
     function fg!(grads::S, x::S)
-
-        _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
+        
+        fval, back = let f=f; pullback(f, x) end
+        grads .= back(one(fval))[1]
 
         return fval
     end
+
+    #NEW: Using Enzyme
+    # function fg!(grads::S, x::S)
+
+    #     _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
+
+    #     return fval
+    # end
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
@@ -107,12 +111,12 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    if (typeof(opt.solver) <: KrylovSolver)
+    if (typeof(opt.solver) <: GLKSolver)
         power = 2
-    elseif (typeof(opt.solver) <: ShaleSolver)
+    elseif typeof(opt.solver) <: KrylovSolver
         power = 1
-    elseif (typeof(opt.solver) <: CraigSolver)
-        power = 1
+    elseif typeof(opt.solver) <: NystromDefiniteSolver
+        power = 2
     else
         power = 1
     end

@@ -24,7 +24,13 @@ result = similar(x)
 #Enzyme
 Hv = EHvpOperator(rosenbrock, x)
 t = @benchmark LA.mul!($result, $Hv, v) setup=(v=randn(dim))
-println("Enzyme")
+println("Enzyme Op")
+display(t)
+println()
+
+#Enzyme
+t = @benchmark ehvp!($result, $rosenbrock, $x, v) setup=(v=randn(dim))
+println("Enzyme func")
 display(t)
 println()
 
