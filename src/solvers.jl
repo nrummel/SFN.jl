@@ -59,16 +59,16 @@ function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
     shifts = solver.quad_nodes .+ λ
 
     #perfect preconditioning
-    E = eigen(Hermitian(Matrix(Hv.op))) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
+    # E = eigen(Hermitian(Matrix(Hv.op))) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
 
-    Hv.nprod += length(b)
+    # Hv.nprod += length(b)
 
-    @. E.values = abs(E.values)
+    # @. E.values = (E.values)^2
 
-    M = inv(E)
+    # M = inv(E)
     #
 
-    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, M=M, itmax=solver.krylov_order, timemax=time_limit)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
 
     # if sum(solver.krylov_solver.converged) != length(shifts)
     #     println("WARNING: Solver failure")
@@ -116,31 +116,25 @@ end
 function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    β = 1. #NOTE: This could be set to some good estimate for where eigenvalues of Hv are clustered
+    β = 50. #NOTE: This could be set to some good estimate for where eigenvalues of Hv are clustered
+
+    #trying to set β well
+    E = eigen(Hermitian(Matrix(Hv.op))) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
+
+    Hv.nprod += length(b)
+
+    β = mean(abs.(E.values))
+    # println("β: ", β)
+    #
 
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
     scales = solver.quad_nodes .+ 1
 
-    ####
-    # Λ, V = eigen(Hermitian(Matrix(Hv.op))) #eigen decomp of H
-    # Λ = Diagonal(inv.(abs.(Λ))) #rank-k |H|^-1
-
-    # P = V*Λ*V'
-    ####
-
-    ###
-    # D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), 3, :LM)
-
-    # @. D = inv(sqrt(D))
-    # V = stack(V)
-    # P = V*Diagonal(D)*V'
-    ###
-
     cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit)
 
-    if sum(solver.krylov_solver.converged) != length(scales)
-        println("WARNING: Solver failure")
-    end
+    # if sum(solver.krylov_solver.converged) != length(scales)
+    #     println("WARNING: Solver failure")
+    # end
 
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
@@ -148,7 +142,7 @@ function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
     end
 
-    # @. solver.p *= sqrt(β)
+    @. solver.p *= sqrt(β)
 
     return
 end
