@@ -65,10 +65,16 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=
     #setup hvp operator
     if (typeof(opt.solver) <: GLKSolver)
         power = 2
+    elseif typeof(opt.solver) <: GCKSolver
+        power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
     elseif typeof(opt.solver) <: NystromDefiniteSolver
         power = 2
+    elseif typeof(opt.solver) <: NystromIndefiniteSolver
+        power = 1
+    elseif typeof(opt.solver) <: RNSolver
+        power = 1
     else
         power = 1
     end
@@ -113,10 +119,14 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000,
     #setup hvp operator
     if (typeof(opt.solver) <: GLKSolver)
         power = 2
+    elseif typeof(opt.solver) <: GCKSolver
+        power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
     elseif typeof(opt.solver) <: NystromDefiniteSolver
         power = 2
+    elseif typeof(opt.solver) <: NystromIndefiniteSolver
+        power = 1
     else
         power = 1
     end
@@ -207,7 +217,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
 
         λ = min(1e15, opt.M*g_norm) #+ opt.ϵ #compute regularization
 
-        println("λ: ", λ)
+        # println("λ: ", λ)
 
         step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
 

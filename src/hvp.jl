@@ -67,6 +67,21 @@ function *(Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperato
 end
 
 #=
+Out of place matrix matrix multiplcation with HvpOperator
+
+WARNING: Default construction for Hv is power=1
+
+Input:
+	Hv :: HvpOperator
+	v :: rhs vector
+=#
+function *(Hv::H, V::M) where {M<:Matrix{<:AbstractFloat}, H<:HvpOperator}
+	res = similar(V)
+	mul!(res, Hv, V)
+	return res
+end
+
+#=
 In-place matrix vector multiplcation with HvpOperator
 
 WARNING: Default construction for Hv is power=1
@@ -97,7 +112,7 @@ Input:
 	v :: rhs vector
 =#
 function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:Matrix{<:AbstractFloat}, H<:HvpOperator}
-	for i=1:range(size(V,2))
+	for i=1:size(V,2)
 		@views mul!(result[:,i], Hv, V[:,i])
 	end
 

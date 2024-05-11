@@ -5,10 +5,49 @@ SFN step solvers.
 =#
 
 using FastGaussQuadrature: gausslaguerre, gausschebyshevt
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CraigmrSolver, craigmr!, CgLanczosShaleSolver, cg_lanczos_shale!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CraigmrSolver, craigmr!, CgLanczosShaleSolver, cg_lanczos_shale!
 using Arpack: eigs
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using RandomizedPreconditioners: NystromSketch, NystromPreconditioner
+
+########################################################
+
+#=
+Find search direction using shifted CG Lanczos
+=#
+mutable struct RNSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+    krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
+    krylov_order::I #maximum Krylov subspace size
+    p::S #search direction
+end
+
+function RNSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+
+    #krylov solver
+    solver = CgLanczosShiftSolver(dim, dim, 1, type)
+    if krylov_order == -1
+        krylov_order = dim
+    elseif krylov_order == -2
+        krylov_order = Int(ceil(log(dim)))
+    end
+
+    return RNSolver(solver, krylov_order, type(undef, dim))
+end
+
+function step!(solver::RNSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
+
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, [sqrt(λ)], itmax=solver.krylov_order, timemax=time_limit)
+
+    # if sum(solver.krylov_solver.converged) != length(shifts)
+    #     println("WARNING: Solver failure")
+    # end
+
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+
+    solver.p .= solver.krylov_solver.x[1]
+
+    return
+end
 
 ########################################################
 
@@ -116,7 +155,7 @@ end
 function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     solver.p .= 0
 
-    β = 50. #NOTE: This could be set to some good estimate for where eigenvalues of Hv are clustered
+    β = 1. #NOTE: This could be set to some good estimate for where eigenvalues of Hv are clustered
 
     #trying to set β well
     E = eigen(Hermitian(Matrix(Hv.op))) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
@@ -124,8 +163,11 @@ function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
     Hv.nprod += length(b)
 
     β = mean(abs.(E.values))
-    # println("β: ", β)
-    #
+    # # # println("β: ", β)
+
+    # @. E.values = E.values^2
+    # M = inv(E)
+    # #
 
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
     scales = solver.quad_nodes .+ 1
@@ -175,9 +217,11 @@ function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
 
     # push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
 
-    @. D = inv(sqrt(D^2+λ))
-    V = stack(V)
-    mul!(solver.p, V*Diagonal(D)*V', b) #not the fastest way to do this
+    @. D = sqrt(D^2+λ)
+    E = Eigen(D, stack(V))
+    mul!(solver.p, inv(E), b) #not the fastest way to do this
+
+    # println(inv.(D[1:4]))
 
     return
 end
@@ -386,7 +430,7 @@ end
 ########################################################
 
 #=
-Find search direction using full eigendecomposition
+Find search direction using randomized definite Nystrom
 =#
 mutable struct NystromDefiniteSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     k::I #rank
@@ -412,24 +456,67 @@ end
 ########################################################
 
 #=
-Find search direction using full eigendecomposition
+Find search direction using randomized indefinite Nystrom
 =#
 mutable struct NystromIndefiniteSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+    r::I #rank
+    s::I #sketch size
+    p::S #search direction
+end
+
+function NystromIndefiniteSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, r::I=Int(ceil(sqrt(dim))), c::T=1.5) where {I<:Integer, T<:AbstractFloat}
+    # return NystromIndefiniteSolver(r, Int(ceil(c*r)), type(undef, dim))
+    return NystromIndefiniteSolver(20, 50, type(undef, dim))
+end
+
+function step!(solver::NystromIndefiniteSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    Ω = randn(size(Hv,1), solver.s) #Guassian test matrix
+
+    C = Hv*Ω #sketch
+    W = Ω'*C #sketch
+    Λ, V = eigen(Hermitian(W), sortby=(-)∘(abs)) #eigendecomposition
+    Λ, V = Λ[1:solver.r], V[:,1:solver.r]
+
+    Wr = V*Diagonal(inv.(Λ))*V'
+
+    Q, R = qr(C)
+    Σ, U = eigen(Hermitian(R*Wr*R'), sortby=(-)∘(abs))
+    E = Eigen(Σ[1:solver.r], Q*U[:,1:solver.r])
+    @. E.values = sqrt(E.values^2+λ)
+
+    mul!(solver.p, inv(E), b)
+
+    # println(inv.(E.values[1:4]))
+
+    return 
+end
+
+########################################################
+
+#=
+Find search direction using randomized SVD
+=#
+mutable struct RSVDSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     k::I #rank
     r::I #sketch size
     p::S #search direction
 end
 
-function NystromIndefiniteSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, k::I=Int(ceil(sqrt(dim))), r::I=Int(ceil(1.5*k))) where {I<:Integer, T<:AbstractFloat}
-    return NystromIndefiniteSolver(k, r, type(undef, dim))
+function RSVDSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, k::I=Int(ceil(sqrt(dim))), r::I=Int(ceil(1.5*k))) where {I<:Integer, T<:AbstractFloat}
+    return RSVDSolver(k, r, type(undef, dim))
 end
 
-function step!(solver::NystromIndefiniteSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-    Ω = randn(size(H,1), solver.r) #Guassian test matrix
+function step!(solver::RSVDSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    # Ω = srft(solver.k)
+    Ω = randn(size(Hv,1), solver.k)
+    
+    Y=Hv*Ω; Q = Matrix(qr!(Y).Q)
+    B=(Q'Y)\(Q'Ω)
+    E=eigen!(B)
+    E=Eigen(E.values, Q*real.(E.vectors))
 
-    C = Hv*Ω #sketch
-    W = Ω*C
-    E = eigen(Symmetric(W))
+    @. E.values = sqrt(real(E.values)^2+λ)
+    mul!(solver.p, inv(E), b)
 
     return
 end
