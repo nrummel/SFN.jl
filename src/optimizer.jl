@@ -167,26 +167,26 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     g_norm = norm(grads)
 
     #estimate regularization
-    if opt.linesearch
-        ζ = randn(length(x))
-        D = norm(ζ)^2
+    # if opt.linesearch
+    #     ζ = randn(length(x))
+    #     D = norm(ζ)^2
 
-        g2 = similar(grads)
-        fg!(g2, x+ζ)
+    #     g2 = similar(grads)
+    #     fg!(g2, x+ζ)
 
-        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-            opt.M = 1e15
-        else
-            apply!(ζ, Hv, ζ) 
-            ζ .= g2-grads-ζ
+    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+    #         opt.M = 1e15
+    #     else
+    #         apply!(ζ, Hv, ζ) 
+    #         ζ .= g2-grads-ζ
 
-            opt.M = min(1e15, 2*norm(ζ)/(D))
-        end
+    #         opt.M = min(1e15, 2*norm(ζ)/(D))
+    #     end
 
-        # println("Estimated M: ", opt.M, '\n')
+    #     # println("Estimated M: ", opt.M, '\n')
 
-        g2 = nothing #mark for collection
-    end
+    #     g2 = nothing #mark for collection
+    # end
     # opt.M = 1.0
 
     #compute tolerance

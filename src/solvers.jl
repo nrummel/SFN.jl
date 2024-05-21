@@ -209,13 +209,13 @@ function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) w
     # krylov_solver = Lanczos(krylovdim=dim, maxiter=50, tol=100, orth=KrylovDefaults.orth, eager=false, verbosity=0)
     # return KrylovSolver(rank, krylov_solver, type(undef, dim))
 
-    return KrylovSolver(rank, k, 50, rand(T, dim))
+    return KrylovSolver(rank, dim, 10, rand(T, dim))
 end
 
 function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
 
     # D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
-    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, krylovdim=solver.krylovdim, maxiter=solver.maxiter, tol=0.01*λ)
+    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, krylovdim=solver.krylovdim, maxiter=solver.maxiter, tol=λ)
 
     # push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
     
