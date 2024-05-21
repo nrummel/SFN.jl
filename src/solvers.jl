@@ -5,7 +5,7 @@ SFN step solvers.
 =#
 
 using FastGaussQuadrature: gausslaguerre, gausschebyshevt
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CraigmrSolver, craigmr!, CgLanczosShaleSolver, cg_lanczos_shale!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CraigmrSolver, craigmr!, CgLanczosShaleSolver, cg_lanczos_shale!, hermitian_lanczos
 using Arpack: eigs
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using RandomizedPreconditioners: NystromSketch, NystromPreconditioner
@@ -203,34 +203,73 @@ mutable struct KrylovSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
 end
 
 function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    # rank = Int(ceil(log(dim)))
     rank = Int(ceil(sqrt(dim)))
-    # rank = min(dim, 100)
     k = Int(ceil(rank*1.5))
-    # k = dim
 
     # krylov_solver = Lanczos(krylovdim=dim, maxiter=50, tol=100, orth=KrylovDefaults.orth, eager=false, verbosity=0)
-    
     # return KrylovSolver(rank, krylov_solver, type(undef, dim))
+
     return KrylovSolver(rank, k, 50, rand(T, dim))
 end
 
 function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-    # solver.p .= 0
 
     # D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
-    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, krylovdim=solver.krylovdim, maxiter=solver.maxiter, tol=λ)
+    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, krylovdim=solver.krylovdim, maxiter=solver.maxiter, tol=0.01*λ)
 
     # push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
+    
+    @. D = inv(sqrt(D^2+λ))
+    V = stack(V)
 
-    @. D = sqrt(D^2+λ)
-    E = Eigen(D, stack(V))
-    mul!(solver.p, inv(E), b) #not the fastest way to do this
+    cache = S(undef, length(D))
 
-    # println(inv.(D[1:4]))
+    mul!(cache, V', b)
+    @. cache *= D
+    mul!(solver.p, V, cache)
 
     return
 end
+
+########################################################
+
+# #=
+# Find search direction using low-rank eigendecomposition with Arpack
+# =#
+# mutable struct KrylovTriSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+#     rank::I #
+#     krylovdim::I
+#     p::S #search direction
+# end
+
+# function KrylovTriSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+#     # rank = Int(ceil(log(dim)))
+#     rank = Int(ceil(sqrt(dim)))
+#     # rank = min(dim, 100)
+#     k = Int(ceil(rank*1.5))
+#     # k = dim
+
+#     # krylov_solver = Lanczos(krylovdim=dim, maxiter=50, tol=100, orth=KrylovDefaults.orth, eager=false, verbosity=0)
+    
+#     # return KrylovSolver(rank, krylov_solver, type(undef, dim))
+#     return KrylovTriSolver(rank, rank, rand(T, dim))
+# end
+
+# function step!(solver::KrylovTriSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+#     # solver.p .= 0
+
+#     V, _, Tri = hermitian_lanczos(Hv, b, solver.krylovdim)
+#     Tri = SymTridiagonal(Tri[1:solver.krylovdim,:])
+
+#     E = eigen(Tri)
+#     E = Eigen(E.values, V[:,1:solver.rank]*E.vectors)
+#     @. E.values = sqrt(E.values^2+λ)
+#     mul!(solver.p, inv(E), b) #not the fastest way to do this
+
+#     # println(inv.(D[1:4]))
+
+#     return
+# end
 
 ########################################################
 
