@@ -104,7 +104,7 @@ function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
 
     # @. E.values = (E.values)^2
 
-    # M = inv(E)
+    # M = pinv(E)
     #
 
     cg_lanczos_shift!(solver.krylov_solver, Hv, b, shifts, itmax=solver.krylov_order, timemax=time_limit)
@@ -166,7 +166,7 @@ function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
     # # # println("β: ", β)
 
     # @. E.values = E.values^2
-    # M = inv(E)
+    # M = pinv(E)
     # #
 
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
@@ -196,7 +196,9 @@ Find search direction using low-rank eigendecomposition with Arpack
 =#
 mutable struct KrylovSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     rank::I #
-    krylov_solver::Lanczos #
+    # krylov_solver::Lanczos #
+    krylovdim::I
+    maxiter::I
     p::S #search direction
 end
 
@@ -204,16 +206,20 @@ function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) w
     # rank = Int(ceil(log(dim)))
     rank = Int(ceil(sqrt(dim)))
     # rank = min(dim, 100)
+    k = Int(ceil(rank*1.5))
+    # k = dim
 
-    krylov_solver = Lanczos(krylovdim=dim, maxiter=KrylovDefaults.maxiter, tol=1e-6, orth=KrylovDefaults.orth, eager=false, verbosity=0)
+    # krylov_solver = Lanczos(krylovdim=dim, maxiter=50, tol=100, orth=KrylovDefaults.orth, eager=false, verbosity=0)
     
-    return KrylovSolver(rank, krylov_solver, type(undef, dim))
+    # return KrylovSolver(rank, krylov_solver, type(undef, dim))
+    return KrylovSolver(rank, k, 50, rand(T, dim))
 end
 
 function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-    solver.p .= 0
+    # solver.p .= 0
 
-    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
+    # D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
+    D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, krylovdim=solver.krylovdim, maxiter=solver.maxiter, tol=λ)
 
     # push!(stats.krylov_iterations, info.numiter) #NOTE: This isn't right
 
@@ -248,7 +254,7 @@ function step!(solver::ArpackSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_l
 
     D, V = eigs(Hv, nev=solver.rank, which=:LM, ritzvec=true)
 
-    @. D = inv(sqrt(D^2+λ))
+    @. D = pinv(sqrt(D^2+λ))
     # mul!(solver.p, V', b)
     # mul!(solver.p, Diagonal(D), solver.p)
     # mul!(solver.p, V, solver.p)
@@ -420,9 +426,9 @@ function step!(solver::CraigSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_li
         solver.p .+= solver.quad_weights[i]*solver.krylov_solver.y
     end
 
-    if solved == false
-        println("WARNING: Solver failure")
-    end
+    # if solved == false
+    #     println("WARNING: Solver failure")
+    # end
 
     return
 end
@@ -477,16 +483,16 @@ function step!(solver::NystromIndefiniteSolver, stats::SFNStats, Hv::H, b::S, λ
     Λ, V = eigen(Hermitian(W), sortby=(-)∘(abs)) #eigendecomposition
     Λ, V = Λ[1:solver.r], V[:,1:solver.r]
 
-    Wr = V*Diagonal(inv.(Λ))*V'
+    Wr = V*Diagonal(pinv.(Λ))*V'
 
     Q, R = qr(C)
     Σ, U = eigen(Hermitian(R*Wr*R'), sortby=(-)∘(abs))
     E = Eigen(Σ[1:solver.r], Q*U[:,1:solver.r])
     @. E.values = sqrt(E.values^2+λ)
 
-    mul!(solver.p, inv(E), b)
+    mul!(solver.p, pinv(E), b)
 
-    # println(inv.(E.values[1:4]))
+    # println(pinv.(E.values[1:4]))
 
     return 
 end
@@ -516,7 +522,7 @@ function step!(solver::RSVDSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_lim
     E=Eigen(E.values, Q*real.(E.vectors))
 
     @. E.values = sqrt(real(E.values)^2+λ)
-    mul!(solver.p, inv(E), b)
+    mul!(solver.p, pinv(E), b)
 
     return
 end
