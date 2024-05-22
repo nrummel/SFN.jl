@@ -34,7 +34,14 @@ end
 
 function step!(solver::RNSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
 
-    cg_lanczos_shift!(solver.krylov_solver, Hv, b, [sqrt(λ)], itmax=solver.krylov_order, timemax=time_limit)
+    λ = sqrt(λ)
+
+    ζ = 0.5
+    ξ = T(0.01)
+    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*λ^(1+ζ)))
+    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*λ^(ζ)))
+    
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, [λ], itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
     # if sum(solver.krylov_solver.converged) != length(shifts)
     #     println("WARNING: Solver failure")
