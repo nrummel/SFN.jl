@@ -15,7 +15,7 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S1<:AbstractVector{T}, S2<:AbstractVector{T}}
+function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, p_norm::T, f::F, fval::T, λ::T) where {F, T<:AbstractFloat, S1<:AbstractVector{T}, S2<:AbstractVector{T}}
 
     # println("Reg: ", λ)
 
@@ -25,16 +25,9 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, f::F, fval::T
     #increase step-size first
     η = 2.0
 
-    #scale search direction
+    #scale search direction and norm
     p .*= η
-
-    #search direction norm
-    p_norm = norm(p)
-
-    if p_norm < eps(T)
-        stats.status = "search direction too small"
-        return false
-    end
+    p_norm *= η 
     
     #target decrement
     dec = p_norm^2*sqrt(λ)*(1-3*sqrt(3))/6
@@ -44,7 +37,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, f::F, fval::T
         stats.f_evals += 1
 
         if f(x+p)-fval ≤ dec
-            # println("Reduction: ", f(x+p)-fval)
+            # println("Reduction: ", f(x+p)-fval, " Dec: ", dec)
             break
         else
             η *= opt.α #reduce step-size
@@ -66,7 +59,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, f::F, fval::T
     # println("Updated M: ", opt.M)
 
     #update iterate
-    x .+= p
+    # x .+= p
 
     return success
 end

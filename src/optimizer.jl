@@ -69,10 +69,10 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=
         power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
-    elseif typeof(opt.solver) <: NystromDefiniteSolver
-        power = 2
-    elseif typeof(opt.solver) <: NystromIndefiniteSolver
-        power = 1
+    # elseif typeof(opt.solver) <: NystromDefiniteSolver
+    #     power = 2
+    # elseif typeof(opt.solver) <: NystromIndefiniteSolver
+    #     power = 1
     elseif typeof(opt.solver) <: RNSolver
         power = 1
     else
@@ -123,10 +123,10 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000,
         power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
-    elseif typeof(opt.solver) <: NystromDefiniteSolver
-        power = 2
-    elseif typeof(opt.solver) <: NystromIndefiniteSolver
-        power = 1
+    # elseif typeof(opt.solver) <: NystromDefiniteSolver
+    #     power = 2
+    # elseif typeof(opt.solver) <: NystromIndefiniteSolver
+    #     power = 1
     else
         power = 1
     end
@@ -167,26 +167,26 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     g_norm = norm(grads)
 
     #estimate regularization
-    # if opt.linesearch
-    #     ζ = randn(length(x))
-    #     D = norm(ζ)^2
+    if opt.linesearch
+        ζ = randn(length(x))
+        D = norm(ζ)^2
 
-    #     g2 = similar(grads)
-    #     fg!(g2, x+ζ)
+        g2 = similar(grads)
+        fg!(g2, x+ζ)
 
-    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-    #         opt.M = 1e15
-    #     else
-    #         apply!(ζ, Hv, ζ) 
-    #         ζ .= g2-grads-ζ
+        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+            opt.M = 1e15
+        else
+            apply!(ζ, Hv, ζ) 
+            ζ .= g2-grads-ζ
 
-    #         opt.M = min(1e15, 2*norm(ζ)/(D))
-    #     end
+            opt.M = min(1e8, 2*norm(ζ)/(D))
+        end
 
-    #     # println("Estimated M: ", opt.M, '\n')
+        # println("Estimated M: ", opt.M, '\n')
 
-    #     g2 = nothing #mark for collection
-    # end
+        g2 = nothing #mark for collection
+    end
     # opt.M = 1.0
 
     #compute tolerance
@@ -216,21 +216,25 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         #step
 
         λ = min(1e15, opt.M*g_norm) #+ opt.ϵ #compute regularization
-
         # println("λ: ", λ)
 
+        #solve for search direction
         step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
 
-        success = true
+        #test search direction, select negative gradient if too small
+        p_norm = norm(opt.solver.p)
 
-        if opt.linesearch
-            success = search!(opt, stats, x, opt.solver.p, f, fval, λ)
-        else
-            x .+= opt.solver.p
+        if p_norm < sqrt(eps(T))
+            opt.solver.p .= -grads
+            p_norm = g_norm
+            # println("reverting to gradient")
         end
 
-        if success == false
+        #linesearch
+        if opt.linesearch && !search!(opt, stats, x, opt.solver.p, p_norm, f, fval, λ)
             break
+        else
+            x .+= opt.solver.p
         end
         ##########
 
