@@ -51,6 +51,11 @@ function Base.Matrix(Hv::HvpOperator{T}) where {T}
 	return Hermitian(H)
 end
 
+function Base.Matrix(Hv::LHvpOperator{T}) where {T}
+	Hv.nprod += size(Hv, 1)
+	return Hermitian(Matrix(Hv.op))
+end
+
 #=
 Out of place matrix vector multiplcation with HvpOperator
 

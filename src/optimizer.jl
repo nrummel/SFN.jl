@@ -151,86 +151,86 @@ Input:
     time_limit :: maximum run time
 =#
 function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
-    #start time
+    #Start time
     tic = time_ns()
     
-    #stats
+    #Stats
     stats = SFNStats(T)
     converged = false
     iterations = 0
     
-    #gradient allocation
+    #Gradient allocation
     grads = similar(x)
 
-    #compute function and gradient
+    #Compute function and gradient
     fval = fg!(grads, x)
     g_norm = norm(grads)
 
-    #estimate regularization
-    if opt.linesearch
-        ζ = randn(length(x))
-        D = norm(ζ)^2
+    #Estimate regularization
+    # if opt.linesearch
+    #     ζ = randn(length(x))
+    #     D = norm(ζ)^2
 
-        g2 = similar(grads)
-        fg!(g2, x+ζ)
+    #     g2 = similar(grads)
+    #     fg!(g2, x+ζ)
 
-        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-            opt.M = 1e15
-        else
-            apply!(ζ, Hv, ζ) 
-            ζ .= g2-grads-ζ
+    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+    #         opt.M = 1e15
+    #     else
+    #         apply!(ζ, Hv, ζ) 
+    #         ζ .= g2-grads-ζ
 
-            opt.M = min(1e8, 2*norm(ζ)/(D))
-        end
+    #         opt.M = min(1e8, 2*norm(ζ)/(D))
+    #     end
 
-        # println("Estimated M: ", opt.M, '\n')
+    #     println("Estimated M: ", opt.M, '\n')
 
-        g2 = nothing #mark for collection
-    end
-    # opt.M = 1.0
+    #     g2 = nothing #mark for collection
+    # end
+    opt.M = 1e-8
 
-    #compute tolerance
+    #Tolerance
     tol = opt.atol + opt.rtol*g_norm
 
-    #initial stats
+    #Initial stats
     push!(stats.f_seq, fval)
     push!(stats.g_seq, g_norm)
 
-    #iterate
+    #Iterate
     while iterations<itmax+1
-        #check gradient norm
-        # println("$g_norm ?< $tol")
+
+        #Check gradient norm
         if g_norm <= tol
             converged = true
             break
         end
 
-        #check other exit conditions
+        #Check other exit conditions
         time = elapsed(tic)
 
         if (time>=time_limit) || (iterations==itmax)
             break
         end
 
+        #Step
         ##########
-        #step
 
-        λ = min(1e15, opt.M*g_norm) #+ opt.ϵ #compute regularization
-        # println("λ: ", λ)
+        #Regularization
+        λ = min(1e15, opt.M*g_norm) #+ opt.ϵ
 
-        #solve for search direction
+        #Solve for search direction
         step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
 
-        #test search direction, select negative gradient if too small
+        #Test search direction, select negative gradient if too small
         p_norm = norm(opt.solver.p)
 
         if p_norm < sqrt(eps(T))
             opt.solver.p .= -grads
             p_norm = g_norm
-            # println("reverting to gradient")
+            println("Reverting to gradient")
         end
 
-        #linesearch
+        #Linesearch
         if opt.linesearch && !search!(opt, stats, x, opt.solver.p, p_norm, f, fval, λ)
             break
         else
@@ -238,22 +238,22 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         end
         ##########
 
-        #update function and gradient
+        #Update function and gradient
         fval = fg!(grads, x)
         g_norm = norm(grads)
 
-        #update stats
+        #Update stats
         push!(stats.f_seq, fval)
         push!(stats.g_seq, g_norm)
 
-        #update hvp operator
+        #Update Hvp operator
         update!(Hv, x)
 
-        #increment
+        #Increment
         iterations += 1
     end
 
-    #update stats
+    #Update stats
     stats.converged = converged
     stats.iterations = iterations
     stats.f_evals += iterations+1
