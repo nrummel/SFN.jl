@@ -123,3 +123,39 @@ function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:Matrix{<:AbstractF
 
 	return nothing
 end
+
+#=
+In-place approximation of Hessian norm via power method
+
+Input:
+	Hv :: HvpOperator
+=#
+function eigmax(Hv::H; tol::T=1e2, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
+	x0 = rand(eltype(Hv), size(Hv, 1))
+    rmul!(x0, one(eltype(Hv)) / norm(x0))
+
+	r = similar(x0)
+	Ax = similar(x0)
+
+	θ = 0.0
+
+	for i=1:maxiter
+		apply!(Ax, Hv, x0)
+
+		θ = dot(x0, Ax)
+
+		copyto!(r, Ax)
+		axpy!(-θ, x0, r)
+
+		res_norm = norm(r)
+
+		if res_norm ≤ tol
+			return θ
+		end
+
+		copyto!(x0, Ax)
+		rmul!(x0, one(eltype(x0))/norm(x0))
+	end
+
+	return θ
+end

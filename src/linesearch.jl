@@ -46,7 +46,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, p_norm::T, f:
         #Check step-size
         if η < eps(T)
             success = false
-            stats.status = "linesearch failed"
+            stats.status = "Linesearch failed"
             break
         end
     end

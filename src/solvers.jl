@@ -7,6 +7,7 @@ SFN step solvers.
 using FastGaussQuadrature: gausslaguerre, gausschebyshevt
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
+using IterativeSolvers: powm!
 
 ########################################################
 
@@ -57,9 +58,11 @@ function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
     solver.p .= 0
 
     #Quadrature scaling factor
-    E = eigen(Matrix(Hv)) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
+    # E = eigen(Matrix(Hv)) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
 
-    c = maximum(abs, E.values)
+    # c1 = maximum(abs, E.values) #+ rand([-1,1])*1e2
+    c = eigmax(Hv)
+    # println(abs(c1-c))
 
     #Shifts
     shifts = c^2*solver.quad_nodes .+ λ
@@ -179,8 +182,8 @@ end
 
 function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     rank = Int(ceil(sqrt(dim)))
-    k = Int(ceil(rank*log(rank)))
-    # k = dim
+    # k = Int(ceil(rank*log(rank)))
+    k = dim
 
     # krylov_solver = Lanczos(krylovdim=dim, maxiter=50, tol=100, orth=KrylovDefaults.orth, eager=false, verbosity=0)
     # return KrylovSolver(rank, krylov_solver, type(undef, dim))

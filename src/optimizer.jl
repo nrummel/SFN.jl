@@ -63,16 +63,12 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #setup hvp operator
-    if (typeof(opt.solver) <: GLKSolver)
+    if typeof(opt.solver) <: GLKSolver
         power = 2
     elseif typeof(opt.solver) <: GCKSolver
         power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
-    # elseif typeof(opt.solver) <: NystromDefiniteSolver
-    #     power = 2
-    # elseif typeof(opt.solver) <: NystromIndefiniteSolver
-    #     power = 1
     elseif typeof(opt.solver) <: RNSolver
         power = 1
     else
@@ -117,16 +113,14 @@ Input:
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #setup hvp operator
-    if (typeof(opt.solver) <: GLKSolver)
+    if typeof(opt.solver) <: GLKSolver
         power = 2
     elseif typeof(opt.solver) <: GCKSolver
         power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
-    # elseif typeof(opt.solver) <: NystromDefiniteSolver
-    #     power = 2
-    # elseif typeof(opt.solver) <: NystromIndefiniteSolver
-    #     power = 1
+    elseif typeof(opt.solver) <: RNSolver
+        power = 1
     else
         power = 1
     end
@@ -208,7 +202,11 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         #Check other exit conditions
         time = elapsed(tic)
 
-        if (time>=time_limit) || (iterations==itmax)
+        if time>=time_limit
+            stats.status = "Time limit exceeded"
+            break
+        elseif iterations==itmax
+            stats.status = "Maximum iterations exceeded"
             break
         end
 
@@ -225,9 +223,11 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         p_norm = norm(opt.solver.p)
 
         if p_norm < sqrt(eps(T))
-            opt.solver.p .= -grads
-            p_norm = g_norm
-            println("Reverting to gradient")
+            # opt.solver.p .= -grads
+            # p_norm = g_norm
+            # println("Reverting to gradient")
+            stats.status = "Search direction too small"
+            break
         end
 
         #Linesearch
