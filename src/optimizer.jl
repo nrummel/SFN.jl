@@ -214,7 +214,7 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         ##########
 
         #Regularization
-        λ = min(1e15, opt.M*g_norm) #+ opt.ϵ
+        λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
 
         #Solve for search direction
         step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)

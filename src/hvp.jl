@@ -130,7 +130,7 @@ In-place approximation of Hessian norm via power method
 Input:
 	Hv :: HvpOperator
 =#
-function eigmax(Hv::H; tol::T=1e2, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
+function eigmax(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
 	x0 = rand(eltype(Hv), size(Hv, 1))
     rmul!(x0, one(eltype(Hv)) / norm(x0))
 

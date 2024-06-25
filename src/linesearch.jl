@@ -53,7 +53,7 @@ function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, p::S2, p_norm::T, f:
 
     #Update regularization
     # println("Accepted η: ", η)
-    opt.M = max(min(1e8, opt.M/η^2), 1e-8)
+    opt.M = max(min(1e8, opt.M/η^2), 1e-15)
     # println("Updated M: ", opt.M)
 
     return success

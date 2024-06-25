@@ -58,10 +58,9 @@ function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
 
     #Quadrature scaling factor
     # E = eigen(Matrix(Hv)) #NOTE: WORKS, Using Matrix function from LinearOperator.jl
-
     # c1 = maximum(abs, E.values) #+ rand([-1,1])*1e2
-    c = eigmax(Hv)
-    # println(abs(c1-c))
+
+    c = eigmax(Hv, tol=1e-6)
 
     #Shifts
     shifts = c^2*solver.quad_nodes .+ λ
