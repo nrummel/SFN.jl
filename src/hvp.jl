@@ -19,6 +19,7 @@ Base and LinearAlgebra implementations for HvpOperator
 =#
 Base.eltype(Hv::HvpOperator{T}) where {T} = T
 Base.size(Hv::HvpOperator) = (length(Hv.x), length(Hv.x))
+Base.size(Hv::HvpOperator, d::Integer) = d ≤ 2 ? length(Hv.x) : 1
 Base.adjoint(Hv::HvpOperator) = Hv
 LinearAlgebra.ishermitian(Hv::HvpOperator) = true
 LinearAlgebra.issymmetric(Hv::HvpOperator) = true
@@ -116,7 +117,7 @@ Input:
 	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:Matrix{<:AbstractFloat}, H<:HvpOperator}
+function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:AbstractMatrix{<:AbstractFloat}, H<:HvpOperator}
 	for i=1:size(V,2)
 		@views mul!(result[:,i], Hv, V[:,i])
 	end

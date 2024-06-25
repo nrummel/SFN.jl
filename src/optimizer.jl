@@ -15,6 +15,8 @@ mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S}
     ϵ::T2 #regularization minimum
     solver::S #search direction solver
     linesearch::Bool #whether to use linsearch
+    estimate_M::Bool #whether to estimate M
+    gradient_fallback::Bool #whether to fallback to gradient if search direction is too small
     η::T2 #step-size
     α::T2 #linesearch factor
     atol::T2 #absolute gradient norm tolerance
@@ -37,7 +39,7 @@ Input:
     atol :: absolute gradient norm tolerance
     rtol :: relative gradient norm tolerance
 =#
-function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1e-8, ϵ::T2=eps(Float64), linesearch::Bool=false, estimate_M::Bool=false, gradient_fallback::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
     #regularization
     @assert (0≤M && 0≤ϵ)
 
@@ -48,7 +50,7 @@ function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1.0, ϵ::T2=ep
 
     solver = eval(solver)(dim)
 
-    return SFNOptimizer(M, ϵ, solver, linesearch, η, α, atol, rtol)
+    return SFNOptimizer(M, ϵ, solver, linesearch, estimate_M, gradient_fallback, η, α, atol, rtol)
 end
 
 #=
@@ -66,6 +68,8 @@ function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=
     if typeof(opt.solver) <: GLKSolver
         power = 2
     elseif typeof(opt.solver) <: GCKSolver
+        power = 2
+    elseif typeof(opt.solver) <: LOBPCGSolver
         power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
@@ -117,6 +121,8 @@ function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000,
         power = 2
     elseif typeof(opt.solver) <: GCKSolver
         power = 2
+    elseif typeof(opt.solver) <: LOBPCGSolver
+        power = 2
     elseif typeof(opt.solver) <: KrylovSolver
         power = 1
     elseif typeof(opt.solver) <: RNSolver
@@ -161,27 +167,24 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     g_norm = norm(grads)
 
     #Estimate regularization
-    # if opt.linesearch
-    #     ζ = randn(length(x))
-    #     D = norm(ζ)^2
+    if opt.linesearch && opt.estimate_M
+        ζ = randn(length(x))
+        D = norm(ζ)^2
 
-    #     g2 = similar(grads)
-    #     fg!(g2, x+ζ)
+        g2 = similar(grads)
+        fg!(g2, x+ζ)
 
-    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-    #         opt.M = 1e15
-    #     else
-    #         apply!(ζ, Hv, ζ) 
-    #         ζ .= g2-grads-ζ
+        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+            opt.M = 1e15
+        else
+            apply!(ζ, Hv, ζ) 
+            ζ .= g2-grads-ζ
 
-    #         opt.M = min(1e8, 2*norm(ζ)/(D))
-    #     end
+            opt.M = min(1e8, 2*norm(ζ)/(D))
+        end
 
-    #     println("Estimated M: ", opt.M, '\n')
-
-    #     g2 = nothing #mark for collection
-    # end
-    opt.M = 1e-8
+        g2 = nothing #mark for collection
+    end
 
     #Tolerance
     tol = opt.atol + opt.rtol*g_norm
@@ -222,12 +225,14 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         #Test search direction, select negative gradient if too small
         p_norm = norm(opt.solver.p)
 
-        if p_norm < sqrt(eps(T))
-            # opt.solver.p .= -grads
-            # p_norm = g_norm
-            # println("Reverting to gradient")
-            stats.status = "Search direction too small"
-            break
+        if p_norm < eps(T)
+            if opt.gradient_fallback
+                opt.solver.p .= -grads
+                p_norm = g_norm
+            else
+                stats.status = "Search direction too small"
+                break
+            end
         end
 
         #Linesearch
