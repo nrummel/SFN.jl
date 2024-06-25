@@ -150,12 +150,12 @@ function eigmax(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) whe
 		res_norm = norm(r)
 
 		if res_norm ≤ tol
-			return θ
+			return abs(θ)
 		end
 
 		copyto!(x0, Ax)
 		rmul!(x0, one(eltype(x0))/norm(x0))
 	end
 
-	return θ
+	return abs(θ)
 end
