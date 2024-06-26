@@ -58,7 +58,7 @@ function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limi
     solver.p .= 0
 
     #Quadrature scaling factor
-    c = eigmax(Hv, tol=1e-6)
+    c = eigmax(Hv, tol=1e-1)
 
     #Shifts
     shifts = c^2*solver.quad_nodes .+ λ
