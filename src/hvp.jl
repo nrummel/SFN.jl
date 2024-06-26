@@ -128,6 +128,8 @@ end
 #=
 In-place approximation of Hessian norm via power method
 
+https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl/blob/0b2f1c5d352069df1bc891750087deda2d14cc9d/src/simple.jl#L58-L63
+
 Input:
 	Hv :: HvpOperator
 =#

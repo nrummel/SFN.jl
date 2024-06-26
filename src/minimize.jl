@@ -8,52 +8,6 @@ using Zygote: pullback
 using Enzyme: ReverseWithPrimal
 
 #=
-SFN optimizer struct.
-=#
-mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S}
-    M::T1 #hessian lipschitz constant
-    ϵ::T2 #regularization minimum
-    solver::S #search direction solver
-    linesearch::Bool #whether to use linsearch
-    estimate_M::Bool #whether to estimate M
-    gradient_fallback::Bool #whether to fallback to gradient if search direction is too small
-    η::T2 #step-size
-    α::T2 #linesearch factor
-    atol::T2 #absolute gradient norm tolerance
-    rtol::T2 #relative gradient norm tolerance
-end
-
-#=
-Outer constructor
-
-NOTE: FGQ cant currently handle anything other than Float64
-
-Input:
-    dim :: dimension of parameters
-    solver :: search direction solver
-    M :: hessian lipschitz constant
-    ϵ :: regularization minimum
-    linsearch :: whether to use linesearch
-    η :: step-size in (0,1)
-    α :: linsearch factor in (0,1)
-    atol :: absolute gradient norm tolerance
-    rtol :: relative gradient norm tolerance
-=#
-function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1e-8, ϵ::T2=eps(Float64), linesearch::Bool=false, estimate_M::Bool=false, gradient_fallback::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
-    #regularization
-    @assert (0≤M && 0≤ϵ)
-
-    if linesearch
-        @assert (0<α && α<1)
-        @assert (0<η && η≤1)
-    end
-
-    solver = eval(solver)(dim)
-
-    return SFNOptimizer(M, ϵ, solver, linesearch, estimate_M, gradient_fallback, η, α, atol, rtol)
-end
-
-#=
 Repeatedly applies the SFN iteration to minimize the function.
 
 Input:
@@ -64,21 +18,8 @@ Input:
     time_limit :: maximum run time
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
-    #setup hvp operator
-    if typeof(opt.solver) <: GLKSolver
-        power = 2
-    elseif typeof(opt.solver) <: GCKSolver
-        power = 2
-    elseif typeof(opt.solver) <: LOBPCGSolver
-        power = 2
-    elseif typeof(opt.solver) <: KrylovSolver
-        power = 1
-    elseif typeof(opt.solver) <: RNSolver
-        power = 1
-    else
-        power = 1
-    end
-    Hv = RHvpOperator(f, x, power=power)
+    #Setup hvp operator
+    Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
 
     #OLD: Using Zygote
     function fg!(grads::S, x::S)
@@ -116,21 +57,8 @@ Input:
     time_limit :: maximum run time
 =#
 function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
-    #setup hvp operator
-    if typeof(opt.solver) <: GLKSolver
-        power = 2
-    elseif typeof(opt.solver) <: GCKSolver
-        power = 2
-    elseif typeof(opt.solver) <: LOBPCGSolver
-        power = 2
-    elseif typeof(opt.solver) <: KrylovSolver
-        power = 1
-    elseif typeof(opt.solver) <: RNSolver
-        power = 1
-    else
-        power = 1
-    end
-    Hv = LHvpOperator(H, x, power=power)
+    #Setup hvp operator
+    Hv = LHvpOperator(H, x, power=hvp_power(opt.solver))
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
@@ -167,24 +95,25 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
     g_norm = norm(grads)
 
     #Estimate regularization
-    if opt.linesearch && opt.estimate_M
-        ζ = randn(length(x))
-        D = norm(ζ)^2
+    #NOTE: Not doing this anymore because it is usually a large overestimate
+    # if opt.linesearch && opt.estimate_M
+    #     ζ = randn(length(x))
+    #     D = norm(ζ)^2
 
-        g2 = similar(grads)
-        fg!(g2, x+ζ)
+    #     g2 = similar(grads)
+    #     fg!(g2, x+ζ)
 
-        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-            opt.M = 1e15
-        else
-            apply!(ζ, Hv, ζ) 
-            ζ .= g2-grads-ζ
+    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+    #         opt.M = 1e15
+    #     else
+    #         apply!(ζ, Hv, ζ) 
+    #         ζ .= g2-grads-ζ
 
-            opt.M = min(1e8, 2*norm(ζ)/(D))
-        end
+    #         opt.M = min(1e8, 2*norm(ζ)/(D))
+    #     end
 
-        g2 = nothing #mark for collection
-    end
+    #     g2 = nothing #mark for collection
+    # end
 
     #Tolerance
     tol = opt.atol + opt.rtol*g_norm
@@ -216,27 +145,11 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         #Step
         ##########
 
-        #Regularization
-        λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
-
         #Solve for search direction
-        step!(opt.solver, stats, Hv, -grads, λ, time_limit-time)
-
-        #Test search direction, select negative gradient if too small
-        p_norm = norm(opt.solver.p)
-
-        if p_norm < eps(T)
-            if opt.gradient_fallback
-                opt.solver.p .= -grads
-                p_norm = g_norm
-            else
-                stats.status = "Search direction too small"
-                break
-            end
-        end
+        step!(opt.solver, stats, Hv, -grads, g_norm, time_limit-time)
 
         #Linesearch
-        if opt.linesearch && !search!(opt, stats, x, opt.solver.p, p_norm, f, fval, λ)
+        if opt.linesearch && !search!(opt, stats, x, f, fval, g_norm)
             break
         else
             x .+= opt.solver.p

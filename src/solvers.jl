@@ -5,7 +5,7 @@ SFN step solvers.
 =#
 
 using FastGaussQuadrature: gausslaguerre, gausschebyshevt
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos! #, CgLanczosShaleSolver, cg_lanczos_shale!
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using IterativeSolvers: lobpcg
 
@@ -20,6 +20,10 @@ mutable struct GLKSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     quad_nodes::S #quadrature nodes
     quad_weights::S #quadrature weights
     p::S #search direction
+end
+
+function hvp_power(solver::GLKSolver)
+    return 2
 end
 
 function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
@@ -52,8 +56,11 @@ function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad
     return GLKSolver(solver, krylov_order, T.(nodes), T.(weights), type(undef, dim))
 end
 
-function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
+function step!(solver::GLKSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
     
+    #Regularization
+    λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
+
     #Reset search direction
     solver.p .= 0
 
@@ -89,73 +96,80 @@ end
 #=
 Shifted and scaled CG Lanczos with Gauss-Chebyshev quadrature.
 =#
-mutable struct GCKSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
-    krylov_solver::CgLanczosShaleSolver #Krylov solver
-    krylov_order::I #maximum Krylov subspace size
-    quad_nodes::S #quadrature nodes
-    quad_weights::S #quadrature weights
-    p::S #search direction
-end
+# mutable struct GCKSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+#     krylov_solver::CgLanczosShaleSolver #Krylov solver
+#     krylov_order::I #maximum Krylov subspace size
+#     quad_nodes::S #quadrature nodes
+#     quad_weights::S #quadrature weights
+#     p::S #search direction
+# end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+# function hvp_power(solver::GCKSolver)
+#     return 2
+# end
 
-    #Quadrature
-    nodes, weights = gausschebyshevt(quad_order)
-    @. weights *= 2/pi #global scaling
+# function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
-    #Krylov solver
-    solver = CgLanczosShaleSolver(dim, dim, quad_order, type)
-    if krylov_order == -1
-        krylov_order = dim
-    elseif krylov_order == -2
-        krylov_order = Int(ceil(log(dim)))
-    end
+#     #Quadrature
+#     nodes, weights = gausschebyshevt(quad_order)
+#     @. weights *= 2/pi #global scaling
 
-    return GCKSolver(solver, krylov_order, nodes, weights, type(undef, dim))
-end
+#     #Krylov solver
+#     solver = CgLanczosShaleSolver(dim, dim, quad_order, type)
+#     if krylov_order == -1
+#         krylov_order = dim
+#     elseif krylov_order == -2
+#         krylov_order = Int(ceil(log(dim)))
+#     end
 
-function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+#     return GCKSolver(solver, krylov_order, nodes, weights, type(undef, dim))
+# end
+
+# function step!(solver::GCKSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     
-    #Reset search direction
-    solver.p .= 0
+#     #Regularization
+#     λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
 
-    #Quadrature constant
-    #=
-    This could be set to some good estimate for where eigenvalues of Hv are clustered.
-    - Trace
-    - Maximum
-    - Median
-    =#
-    β = 1.0
-    # β = λ > 1 ? λ : one(λ) 
-    # β = eigmax(Hv, tol=1e-6)
+#     #Reset search direction
+#     solver.p .= 0
 
-    #Shifts and scalings
-    shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
-    scales = solver.quad_nodes .+ 1
+#     #Quadrature constant
+#     #=
+#     This could be set to some good estimate for where eigenvalues of Hv are clustered.
+#     - Trace
+#     - Maximum
+#     - Median
+#     =#
+#     β = 1.0
+#     # β = λ > 1 ? λ : one(λ) 
+#     # β = eigmax(Hv, tol=1e-6)
 
-    #Tolerance
-    cg_atol = 1e-6
-    cg_rtol = 1e-6
+#     #Shifts and scalings
+#     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
+#     scales = solver.quad_nodes .+ 1
 
-    #CG Solves
-    cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
+#     #Tolerance
+#     cg_atol = 1e-6
+#     cg_rtol = 1e-6
 
-    if sum(solver.krylov_solver.converged) != length(scales)
-        println("WARNING: Solver failure")
-    end
+#     #CG Solves
+#     cg_lanczos_shale!(solver.krylov_solver, Hv, b, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
-    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+#     if sum(solver.krylov_solver.converged) != length(scales)
+#         println("WARNING: Solver failure")
+#     end
 
-    #Update search direction
-    for i in eachindex(scales)
-        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
-    end
+#     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
-    @. solver.p *= sqrt(β)
+#     #Update search direction
+#     for i in eachindex(scales)
+#         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
+#     end
 
-    return
-end
+#     @. solver.p *= sqrt(β)
+
+#     return
+# end
 
 ########################################################
 
@@ -170,6 +184,10 @@ mutable struct KrylovSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     p::S #search direction
 end
 
+function hvp_power(solver::KrylovSolver)
+    return 1
+end
+
 function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     rank = Int(ceil(sqrt(dim)))
     k = Int(ceil(rank*log(rank)))
@@ -180,7 +198,10 @@ function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) w
     # return KrylovSolver(rank, k, 1, type(undef, dim))
 end
 
-function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::KrylovSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
 
     #Low-rank eigendecomposition
     D, V, info = eigsolve(Hv, rand(T, size(Hv,1)), solver.rank, :LM, solver.krylov_solver)
@@ -221,11 +242,18 @@ mutable struct EigenSolver{T<:AbstractFloat, S<:AbstractVector{T}}
     p::S #search direction
 end
 
+function hvp_power(solver::EigenSolver)
+    return 1
+end
+
 function EigenSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     return EigenSolver(type(undef, dim))
 end
 
-function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::EigenSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
 
     #Eigendecomposition
     E = eigen(Matrix(Hv))
@@ -257,6 +285,10 @@ mutable struct LOBPCGSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     p::S #search direction
 end
 
+function hvp_power(solver::LOBPCGSolver)
+    return 2
+end
+
 function LOBPCGSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     rank = Int(ceil(sqrt(dim)))
     k = Int(ceil(rank*log(rank)))
@@ -264,7 +296,10 @@ function LOBPCGSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) w
     return LOBPCGSolver(rank, k, type(undef, dim))
 end
 
-function step!(solver::LOBPCGSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function step!(solver::LOBPCGSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, opt.M*g_norm), 1e-15) #+ opt.ϵ
 
     #Low-rank eigendecomposition
     r = lobpcg(Hv, true, solver.rank, maxiter=solver.maxiter)
@@ -298,6 +333,10 @@ mutable struct RNSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     p::S #search direction
 end
 
+function hvp_power(solver::RNSolver)
+    return 1
+end
+
 function RNSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #krylov solver
@@ -311,9 +350,10 @@ function RNSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, krylo
     return RNSolver(solver, krylov_order, type(undef, dim))
 end
 
-function step!(solver::RNSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
+function step!(solver::RNSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
 
-    λ = sqrt(λ)
+    #Regularization
+    λ = max(min(1e15, sqrt(opt.M*g_norm)), 1e-15)
 
     ζ = 0.5
     ξ = T(0.01)
@@ -322,13 +362,81 @@ function step!(solver::RNSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit
     
     cg_lanczos_shift!(solver.krylov_solver, Hv, b, [λ], itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
-    # if sum(solver.krylov_solver.converged) != length(shifts)
-    #     println("WARNING: Solver failure")
-    # end
+    if sum(solver.krylov_solver.converged) != length(shifts)
+        println("WARNING: Solver failure")
+    end
 
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     solver.p .= solver.krylov_solver.x[1]
+
+    return
+end
+
+########################################################
+
+#=
+Adaptive Regularization with Cubics (ARC) solver using shifted CG Lanczos
+=#
+mutable struct ARCSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
+    krylov_solver::CgLanczosShiftSolver #Krylov solver
+    krylov_order::I #maximum Krylov subspace size
+    shifts::S #shifts
+    α::T2 #
+    η1::T2 #
+    η2::T2 #
+    γ1::T2 #
+    γ2::T2 #
+    p::S #search direction
+end
+
+function hvp_power(solver::ARCSolver)
+    return 1
+end
+
+function ARCSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, num_shifts::I=61, krylov_order::I=0, α::T2=10.0, η1::T2=0.1, η2::T2=0.75, γ1::T2=0.1, γ2::T2=5.0) where {I<:Integer, T<:AbstractFloat}
+
+    #Shifts: TODO
+    shifts = 10.0 .^ (collect(-10.0:0.5:20.0))
+
+    #Krylov solver
+    solver = CgLanczosShiftSolver(dim, dim, num_shifts, type)
+    if krylov_order == -1
+        krylov_order = dim
+    elseif krylov_order == -2
+        krylov_order = Int(ceil(log(dim)))
+    end
+
+    #
+    @assert (0<η1 && η1<η2 && η2<1)
+    @assert (0<γ1 && γ1<1 && 1<γ2)
+
+    return ARCSolver(solver, krylov_order, shifts, α, η1, η2, γ1, γ2, type(undef, dim))
+end
+
+function step!(solver::ARCSolver, stats::SFNStats, Hv::H, b::S, g_norm::T, time_limit::Float64=Inf) where {T<:AbstractFloat, S<:AbstractVector, H<:HvpOperator}
+    
+    #Tolerance
+    ζ = 0.5
+    ξ = T(0.01)
+
+    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
+    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
+
+    #Solver callback, exits when at least one solution that will work has been found
+    cb = (slv) -> begin
+        for i = eachindex(shifts)
+            if !slv.not_cv[i] && (norm(slv.x[i]) / solver.shifts[i] - opt.α > 0)
+                return true
+            end
+        end
+        return false
+    end
+
+    #Solve subproblem
+    cg_lanczos_shift!(solver.krylov_solver, Hv, b, solver.shifts, itmax=solver.krylov_order, timemax=time_limit, check_curvature=true, atol=cg_atol, rtol=cg_rtol, callback=cb)
+
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     return
 end
