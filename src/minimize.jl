@@ -17,7 +17,7 @@ Input:
     itmax :: maximum iterations
     time_limit :: maximum run time
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
+function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {O<:Optimizer, T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #Setup hvp operator
     Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
 
@@ -56,7 +56,7 @@ Input:
     itmax :: maximum iterations
     time_limit :: maximum run time
 =#
-function minimize!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
+function minimize!(opt::O, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #Setup hvp operator
     Hv = LHvpOperator(H, x, power=hvp_power(opt.solver))
 
@@ -78,12 +78,12 @@ Input:
     itmax :: maximum iterations
     time_limit :: maximum run time
 =#
-function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
+function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
     #Start time
     tic = time_ns()
     
     #Stats
-    stats = SFNStats(T)
+    stats = Stats(T)
     converged = false
     iterations = 0
     
@@ -146,10 +146,10 @@ function iterate!(opt::SFNOptimizer, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time
         ##########
 
         #Solve for search direction
-        step!(opt.solver, stats, Hv, -grads, g_norm, time_limit-time)
+        step!(opt.solver, stats, Hv, grads, g_norm, opt.M, time_limit-time)
 
         #Linesearch
-        if opt.linesearch && !search!(opt, stats, x, f, fval, g_norm)
+        if opt.linesearch && !search!(opt, stats, x, f, fval, grads, g_norm, Hv)
             break
         else
             x .+= opt.solver.p

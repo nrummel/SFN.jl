@@ -6,9 +6,9 @@ SFN optimizer stats
 
 using Statistics: mean
 
-export SFNStats
+export Stats
 
-mutable struct SFNStats{I<:Integer, S1<:Vector{<:AbstractFloat}}
+mutable struct Stats{I<:Integer, S1<:Vector{<:AbstractFloat}}
     converged::Bool #whether optimizer has converged
     iterations::I #number of optimizer iterations
     f_evals::I #number of function evaluations
@@ -25,11 +25,11 @@ Outer constructor
 
 Input
 =#
-function SFNStats(type::Type{<:AbstractFloat})
-    return SFNStats(false, 0, 0, 0, 0.0, type[], type[], type[], "")
+function Stats(type::Type{<:AbstractFloat})
+    return Stats(false, 0, 0, 0, 0.0, type[], type[], type[], "")
 end
 
-function Base.show(io::IO, stats::SFNStats)
+function Base.show(io::IO, stats::Stats)
     print(io, "Converged: ", stats.converged, '\n',
                 "Iterations: ", stats.iterations, '\n',
                 "Function Evals: ", stats.f_evals, '\n',

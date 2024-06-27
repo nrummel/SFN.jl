@@ -17,12 +17,13 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::SFNOptimizer, stats::SFNStats, x::S1, f::F, fval::T, g_norm::T) where {F, T<:AbstractFloat, S1<:AbstractVector{T}, S2<:AbstractVector{T}}
+function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
 
     #Setup
     p = opt.solver.p
     p_norm = norm(p)
     success = true
+    λ = max(min(1e15, opt.M*g_norm), 1e-15)
 
     #Test search direction, select negative gradient if too small
     p_norm = norm(opt.solver.p)
@@ -84,43 +85,43 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::ARCOptimizer, stats::SFNStats, x::S1, f::F, fval::T, g_norm::T) where {F, T<:AbstractFloat, S1<:AbstractVector{T}, S2<:AbstractVector{T}}
+function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     
     #Cubic sub-problem
     cubic_subprob = (d) -> begin
-        res = similar(b)
+        res = similar(g)
         mul!(res, Hv, d)
-        return fval + dot(b,d) + 0.5*dot(d, res)
+        return fval + dot(g,d) + 0.5*dot(d, res)
     end
 
     success = false
     shift_failure = false
-    α_new = α
+    M_new = opt.M
     
-    i = findfirst(solver.krylov_solver.converged)
+    i = findfirst(opt.solver.krylov_solver.converged)
 
     if i === nothing
         return success
     end
 
-    j = argmin(abs.(opt.α*solver.shifts[i:end]-norm.(solver.krylov_solver.x[i:end]))) + i-1
+    j = argmin(abs.(opt.M*opt.solver.shifts[i:end]-norm.(opt.solver.krylov_solver.x[i:end]))) + i-1
 
     while !success && !shift_failure
         stats.f_evals += 1
 
-        ρ = (fval - f(x + solver.krylov_solver.x[j]))/(fval - cubic_subprob(solver.krylov_solver.x[j], fval, grads, Hv))
+        ρ = (fval - f(x + opt.solver.krylov_solver.x[j]))/(fval - cubic_subprob(opt.solver.krylov_solver.x[j]))
 
         #unsuccessful
-        if ρ<η1
-            α_new = α
+        if ρ < opt.η1
+            M_new = opt.M
 
-            while α_new > γ1*α
-                if j == length(shifts)
+            while M_new > opt.γ1*opt.M
+                if j == length(opt.solver.shifts)
                     stats.status = "No next shift"
                     shift_failure = true
                     break
                 end
-                α_new = norm(solver.krylov_solver.x[j+1])/solver.shifts[j+1]
+                M_new = norm(opt.solver.krylov_solver.x[j+1])/opt.solver.shifts[j+1]
                 j += 1
             end
             
@@ -129,22 +130,18 @@ function search!(opt::ARCOptimizer, stats::SFNStats, x::S1, f::F, fval::T, g_nor
             success = true
 
             #step
-            solver.p .= solver.krylov_solver.x[j]
+            opt.solver.p .= opt.solver.krylov_solver.x[j]
 
             #very successful
-            if ρ > η2
-                α_new = γ2*α
+            if ρ > opt.η2
+                M_new = opt.γ2*opt.M
             else
-                α_new = α
+                M_new = opt.M
             end
         end
     end
 
-    α = α_new
-
-    if α == Inf
-        stats.status = "Regularization too large"
-    end
+    opt.M = max(M_new, 1e15)
 
     return success
 end
