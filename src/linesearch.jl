@@ -141,7 +141,7 @@ function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
         end
     end
 
-    opt.M = max(M_new, 1e15)
+    opt.M = min(M_new, 1e15)
 
     return success
 end
