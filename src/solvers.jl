@@ -26,7 +26,7 @@ function hvp_power(solver::GLKSolver)
     return 2
 end
 
-function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=31, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
