@@ -5,7 +5,7 @@ SFN optimizer.
 =#
 
 using Zygote: pullback
-using Enzyme: ReverseWithPrimal
+using Enzyme: make_zero!, ReverseWithPrimal
 
 #=
 Repeatedly applies the SFN iteration to minimize the function.
@@ -32,6 +32,7 @@ function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where 
 
     #NEW: Using Enzyme
     function fg!(grads::S, x::S)
+        make_zero!(grads)
 
         _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
 
