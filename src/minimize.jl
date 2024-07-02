@@ -22,21 +22,21 @@ function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where 
     Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
 
     #OLD: Using Zygote
-    function fg!(grads::S, x::S)
-        
-        fval, back = let f=f; pullback(f, x) end
-        grads .= back(one(fval))[1]
-
-        return fval
-    end
-
-    #NEW: Using Enzyme
     # function fg!(grads::S, x::S)
-
-    #     _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
+        
+    #     fval, back = let f=f; pullback(f, x) end
+    #     grads .= back(one(fval))[1]
 
     #     return fval
     # end
+
+    #NEW: Using Enzyme
+    function fg!(grads::S, x::S)
+
+        _, fval = autodiff(ReverseWithPrimal, f, Active, Duplicated(x, grads))
+
+        return fval
+    end
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
