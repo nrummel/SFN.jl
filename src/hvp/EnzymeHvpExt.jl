@@ -53,19 +53,11 @@ end
 In-place hvp operator compatible with Krylov.jl
 =#
 mutable struct EHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator{T}
+    x::S
     duplicated::DuplicatedNoNeed{Duplicated{S}}
     const f::F
 	nprod::I
     const power::I
-end
-
-#=
-Base implementations for EHvpOperator
-=#
-function Base.size(Hv::EHvpOperator)
-    n = size(Hv.duplicated.val.val, 1)
-    
-    return (n,n)
 end
 
 #=
@@ -75,6 +67,7 @@ Input:
 =#
 function update!(Hv::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
     
+    Hv.x .= x
     Hv.duplicated.val.val .= x
 
 	return nothing
@@ -92,7 +85,7 @@ function EHvpOperator(f::F, x::S; power::Integer=1) where {F, T<:AbstractFloat, 
     duplicated1 = Duplicated(x, similar(x))
     duplicated2 = Duplicated(similar(x), similar(x))
 
-    return EHvpOperator(DuplicatedNoNeed(duplicated1, duplicated2), f, 0, power)
+    return EHvpOperator(x, DuplicatedNoNeed(duplicated1, duplicated2), f, 0, power)
 end
 
 #=

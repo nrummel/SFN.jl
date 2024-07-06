@@ -45,7 +45,7 @@ function Base.Matrix(Hv::HvpOperator{T}) where {T}
 
 	@inbounds for i = 1:n
 		ei[i] = one(T)
-		mul!(H[:,i], Hv, ei)
+		mul!(@view(H[:,i]), Hv, ei)
 		ei[i] = zero(T)
 	end
 

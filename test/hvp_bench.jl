@@ -6,7 +6,6 @@ Autodiff Hvp benchmarks.
 
 using SFN
 using BenchmarkTools
-import LinearAlgebra as LA
 
 function rosenbrock(x)
     res = 0.0
@@ -22,8 +21,8 @@ x = zeros(dim)
 result = similar(x)
 
 #Enzyme
-Hv = EHvpOperator(rosenbrock, x)
-t = @benchmark LA.mul!($result, $Hv, v) setup=(v=randn(dim))
+Hv = EHvpOperator(rosenbrock, x, power=1)
+t = @benchmark SFN.apply!($result, $Hv, v) setup=(v=randn(dim))
 println("Enzyme Op")
 display(t)
 println()
@@ -34,16 +33,16 @@ println("Enzyme func")
 display(t)
 println()
 
-#ReverseDiff
-Hv = RHvpOperator(rosenbrock, x)
-t = @benchmark LA.mul!($result, $Hv, v) setup=(v=randn(dim))
-println("ReverseDiff")
-display(t)
-println()
+# #ReverseDiff
+# Hv = RHvpOperator(rosenbrock, x, power=1)
+# t = @benchmark SFN.apply!($result, $Hv, v) setup=(v=randn(dim))
+# println("ReverseDiff")
+# display(t)
+# println()
 
-#Zygote
-Hv = ZHvpOperator(rosenbrock, x)
-t = @benchmark LA.mul!($result, $Hv, v) setup=(v=randn(dim))
-println("Zygote")
-display(t)
-println()
+# #Zygote
+# Hv = ZHvpOperator(rosenbrock, x, power=1)
+# t = @benchmark SFN.apply!($result, $Hv, v) setup=(v=randn(dim))
+# println("Zygote")
+# display(t)
+# println()
