@@ -5,6 +5,7 @@ Tests for functionality found in src/hvp.jl -- helpful functionality.
 =#
 
 import LinearAlgebra as LA
+using Enzyme: hvp
 
 if run_all || "hvp" in ARGS
     @testset "hvp" begin
@@ -23,6 +24,7 @@ if run_all || "hvp" in ARGS
         Test basic hvp function
         =#
         @testset "basic hvp" begin
+            # @test hvp(f, x, v) ≈ product
             @test ehvp(f, x, v) ≈ product
             @test zhvp(f, x, v) ≈ product
             @test rhvp(f, x, v) ≈ product
