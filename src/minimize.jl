@@ -19,18 +19,10 @@ Input:
 =#
 function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where {O<:Optimizer, T1<:AbstractFloat, S<:AbstractVector{T1}, T2, F, I}
     #Setup hvp operator
-    Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
-
-    #OLD: Using Zygote
-    # function fg!(grads::S, x::S)
-        
-    #     fval, back = let f=f; pullback(f, x) end
-    #     grads .= back(one(fval))[1]
-
-    #     return fval
-    # end
 
     #NEW: Using Enzyme
+    Hv = EHvpOperator(f, x, power=hvp_power(opt.solver))
+
     function fg!(grads::S, x::S)
         make_zero!(grads)
 
@@ -38,6 +30,17 @@ function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where 
 
         return fval
     end
+
+    #OLD: Using Zygote
+    # Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
+
+    # function fg!(grads::S, x::S)
+        
+    #     fval, back = let f=f; pullback(f, x) end
+    #     grads .= back(one(fval))[1]
+
+    #     return fval
+    # end
 
     #iterate
     stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
