@@ -74,7 +74,7 @@ Input:
 	Hv :: RHvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hv::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function apply!(result::AbstractVector, Hv::RHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hv.nprod += 1
 
 	Hv.dualCache1 .= Dual{typeof(Tag(Nothing, eltype(v))),eltype(v),1}.(Hv.x, Partials.(Tuple.(v)))

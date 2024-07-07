@@ -51,7 +51,7 @@ Input:
 	Hv :: LHvpOperator
 	v :: rhs vector
 =#
-function apply!(result::S, Hv::LHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function apply!(result::AbstractVector, Hv::LHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
     Hv.nprod += 1
 
     mul!(result, Hv.op, v)

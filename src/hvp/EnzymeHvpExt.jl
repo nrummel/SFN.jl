@@ -96,7 +96,7 @@ Input:
 	Hv :: EHvpOperator
 	v :: rhs vector
 =#
-function apply!(res::S, Hv::EHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
+function apply!(res::AbstractVector, Hv::EHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hv.nprod += 1
 
     make_zero!(Hv.duplicated.val.dval)

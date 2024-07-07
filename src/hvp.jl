@@ -52,11 +52,6 @@ function Base.Matrix(Hv::HvpOperator{T}) where {T}
 	return Hermitian(H)
 end
 
-function Base.Matrix(Hv::LHvpOperator{T}) where {T}
-	Hv.nprod += size(Hv, 1)
-	return Hermitian(Matrix(Hv.op))
-end
-
 #=
 Out of place matrix vector multiplcation with HvpOperator
 
@@ -97,7 +92,7 @@ Input:
 	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::S, Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
+function LinearAlgebra.mul!(result::AbstractVector, Hv::H, v::S) where {S<:AbstractVector{<:AbstractFloat}, H<:HvpOperator}
 	apply!(result, Hv, v)
 
 	@inbounds for i=1:Hv.power-1
@@ -117,7 +112,7 @@ Input:
 	Hv :: HvpOperator
 	v :: rhs vector
 =#
-function LinearAlgebra.mul!(result::M, Hv::H, V::M) where {M<:AbstractMatrix{<:AbstractFloat}, H<:HvpOperator}
+function LinearAlgebra.mul!(result::AbstractMatrix, Hv::H, V::M) where {M<:AbstractMatrix{<:AbstractFloat}, H<:HvpOperator}
 	for i=1:size(V,2)
 		@views mul!(result[:,i], Hv, V[:,i])
 	end
