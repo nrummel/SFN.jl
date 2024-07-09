@@ -5,7 +5,7 @@ Enzyme AD.
 =#
 
 using SFN: HvpOperator
-using Enzyme: make_zero, make_zero!, autodiff, autodiff_deferred, Forward, Reverse, Active, Const, Duplicated, DuplicatedNoNeed
+using Enzyme
 
 export ehvp, ehvp!, EHvpOperator
 
@@ -39,9 +39,9 @@ function ehvp!(res::S, f::F, x::S, v::S) where {F, T<:AbstractFloat, S<:Abstract
     make_zero!(res)
     grad = make_zero(x)
 
-    autodiff(
+    Enzyme.autodiff(
         Forward,
-        d -> autodiff_deferred(Reverse, f, Active, d),
+        d -> Enzyme.autodiff_deferred(Reverse, f, Active, d),
         Const,
         DuplicatedNoNeed(Duplicated(x, grad), Duplicated(v, res))
     )
@@ -54,7 +54,8 @@ In-place hvp operator compatible with Krylov.jl
 =#
 mutable struct EHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Integer} <: HvpOperator{T}
     x::S
-    duplicated::DuplicatedNoNeed{Duplicated{S}}
+    duplicated1::DuplicatedNoNeed{S}
+    duplicated2::Duplicated{S}
     const f::F
 	nprod::I
     const power::I
@@ -68,7 +69,7 @@ Input:
 function update!(Hv::EHvpOperator, x::S) where {S<:AbstractVector{<:AbstractFloat}}
     
     Hv.x .= x
-    Hv.duplicated.val.val .= x
+    Hv.duplicated2.val .= x
 
 	return nothing
 end
@@ -82,10 +83,10 @@ Input:
 =#
 function EHvpOperator(f::F, x::S; power::Integer=1) where {F, T<:AbstractFloat, S<:AbstractVector{T}}
     
-    duplicated1 = Duplicated(x, similar(x))
-    duplicated2 = Duplicated(similar(x), similar(x))
+    duplicated1 = DuplicatedNoNeed(similar(x), similar(x))
+    duplicated2 = Duplicated(x, similar(x))
 
-    return EHvpOperator(x, DuplicatedNoNeed(duplicated1, duplicated2), f, 0, power)
+    return EHvpOperator(x, duplicated1, duplicated2, f, 0, power)
 end
 
 #=
@@ -99,19 +100,18 @@ Input:
 function apply!(res::AbstractVector, Hv::EHvpOperator, v::S) where S<:AbstractVector{<:AbstractFloat}
 	Hv.nprod += 1
 
-    make_zero!(Hv.duplicated.val.dval)
-
-    Hv.duplicated.dval.val .= v
-    make_zero!(Hv.duplicated.dval.dval)
+    Hv.duplicated2.dval .= v
 
     autodiff(
         Forward,
-        d -> autodiff_deferred(Reverse, Hv.f, Active, d),
-        Const,
-        Hv.duplicated
+        Enzyme.gradient_deferred!,
+        Const(Reverse),
+        Hv.duplicated1,
+        Const(Hv.f),
+        Hv.duplicated2
     )
 
-    res .= Hv.duplicated.dval.dval
+    res .= Hv.duplicated1.dval
 
 	return nothing
 end

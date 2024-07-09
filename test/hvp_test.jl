@@ -13,7 +13,7 @@ if run_all || "hvp" in ARGS
         #define the quadratic
         n = 10
         A = randn((n,n))
-        f(x) = LA.dot(x,A,x)
+        f(x)::Float64 = x'*A*x
 
         #hvp problem setup
         x = randn(n)
