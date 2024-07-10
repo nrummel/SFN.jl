@@ -3,7 +3,7 @@ Author: Cooper Simpson
 
 SFN optimizer.
 =#
-
+using Printf
 using Zygote: pullback
 using Enzyme: make_zero!, ReverseWithPrimal
 
@@ -60,14 +60,14 @@ Input:
     itmax :: maximum iterations
     time_limit :: maximum run time
 =#
-function minimize!(opt::O, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
+function minimize!(opt::O, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit::T=Inf, show_trace::Bool=false, show_every::Union{Nothing,Int}=nothing, extended_trace::Bool=false) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, L, I}
     #Setup hvp operator
     Hv = LHvpOperator(H, x, power=hvp_power(opt.solver))
 
     #iterate
-    stats = iterate!(opt, x, f, fg!, Hv, itmax, time_limit)
+    stats,x = iterate!(opt, x, f, fg!, Hv, itmax, time_limit, show_trace, show_every, extended_trace)
 
-    return stats
+    return stats,x
 end
 
 #=
@@ -82,7 +82,7 @@ Input:
     itmax :: maximum iterations
     time_limit :: maximum run time
 =#
-function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
+function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, show_trace::Bool, show_every::Union{Nothing,Int}, extended_trace::Bool) where {O<:Optimizer, T<:AbstractFloat, S<:AbstractVector{T}, F1, F2, H<:HvpOperator, I}
     #Start time
     tic = time_ns()
     
@@ -127,14 +127,35 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
     push!(stats.g_seq, g_norm)
 
     #Iterate
+    if show_trace 
+        @info "| iter\t|\tObjective\t|\tgradNorm\t|\ttime (s)\t|"
+        str = @sprintf "| init\t|\t%.4e\t|\t%.4e\t|\t %.2f\t|" fval g_norm elapsed(tic)
+        @info str
+        if extended_trace 
+            xRnd = round.(x; digits=2)
+            @info "  x = $(xRnd)"
+        end
+    end
+    xᵢ₋₁ = copy(x)
     while iterations<itmax+1
-
         #Check gradient norm
+        # relerr = norm(x - xᵢ₋₁) / norm(x)
         if g_norm <= tol
+            if show_trace
+                str = @sprintf "| %d\t|\t%.4e\t|\t%.4e\t|\t %.2f\t|" iterations fval g_norm elapsed(tic)
+                @info str
+                @info "Converged! ||∇f|| ≤ ϵ"
+                @info @sprintf "  %.2e ≤ %.2e" g_norm tol
+            end
             converged = true
             break
+        # elseif  iterations > 0 && relerr <= opt.rtol 
+        #     if show_trace
+        #         @info "Converged!  ||x - xᵢ₋₁||₂ / ||xᵢ₋₁||₂ ≤ ϵᵣ"
+        #         @info @sprintf "%.2e ≤ %.2e" relerr opt.rtol
+        #     end
+        #     break
         end
-
         #Check other exit conditions
         time = elapsed(tic)
 
@@ -154,6 +175,11 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
 
         #Linesearch
         if opt.linesearch && !search!(opt, stats, x, f, fval, grads, g_norm, Hv)
+            if show_trace
+                str = @sprintf "| %d\t|\t%.4e\t|\t%.4e\t|\t %.2f\t|" iterations fval g_norm elapsed(tic)
+                @info str
+                @info "line search failed !"
+            end
             break
         else
             x .+= opt.solver.p
@@ -163,14 +189,21 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         #Update function and gradient
         fval = fg!(grads, x)
         g_norm = norm(grads)
-
+        if show_trace && (isnothing(show_every) || mod(iterations, show_every) == 0)
+            str = @sprintf "| %d\t|\t%.4e\t|\t%.4e\t|\t %.2f\t|" iterations fval g_norm elapsed(tic)
+            @info str
+            if extended_trace 
+                xRnd = round.(x; digits=2)
+                @info "  xᵢ = $(xRnd)"
+            end
+        end
         #Update stats
         push!(stats.f_seq, fval)
         push!(stats.g_seq, g_norm)
 
         #Update Hvp operator
         update!(Hv, x)
-
+        # xᵢ₋₁ = x
         #Increment
         iterations += 1
     end
@@ -182,5 +215,5 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
     stats.hvp_evals = Hv.nprod
     stats.run_time = elapsed(tic)
 
-    return stats
+    return stats, x
 end

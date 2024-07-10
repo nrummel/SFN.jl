@@ -19,6 +19,10 @@ mutable struct LHvpOperator{F, T<:AbstractFloat, S<:AbstractVector{T}, I<:Intege
     nprod::I
     power::I
 end
+# extend Matrix for the trivial case when the operator is a matrix
+function Base.Matrix(Hvp::LHvpOperator{F,T,S,I,L}) where {F,T,S,I,L<:AbstractMatrix}
+    return Hvp.op
+end
 
 #=
 In place update of LHvpOperator

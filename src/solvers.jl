@@ -259,7 +259,9 @@ function step!(solver::EigenSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, 
     E = eigen(Matrix(Hv))
 
     #Update eigenvalues
-    @. E.values = pinv(sqrt(E.values^2+λ))
+    # @. E.values = pinv(sqrt(E.values^2+λ))
+    # Don't assume positive definite H
+    E.values .= 1 ./ (E.values +  sign.(E.values) .* sqrt(λ))
 
     #Temporary memory
     cache = similar(g)
