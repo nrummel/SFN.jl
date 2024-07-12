@@ -65,9 +65,9 @@ function minimize!(opt::O, x::S, f::F1, fg!::F2, H::L; itmax::I=1000, time_limit
     Hv = LHvpOperator(H, x, power=hvp_power(opt.solver))
 
     #iterate
-    stats,x = iterate!(opt, x, f, fg!, Hv, itmax, time_limit, show_trace, show_every, extended_trace)
+    stats,x,xit = iterate!(opt, x, f, fg!, Hv, itmax, time_limit, show_trace, show_every, extended_trace)
 
-    return stats,x
+    return stats,x,xit
 end
 
 #=
@@ -136,7 +136,9 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
             @info "  x = $(xRnd)"
         end
     end
-    xᵢ₋₁ = copy(x)
+    xit = zeros(eltype(x), length(x), itmax+1)
+    xit[:,1] .= x
+    # xᵢ₋₁ = copy(x)
     while iterations<itmax+1
         #Check gradient norm
         # relerr = norm(x - xᵢ₋₁) / norm(x)
@@ -147,6 +149,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
                 @info "Converged! ||∇f|| ≤ ϵ"
                 @info @sprintf "  %.2e ≤ %.2e" g_norm tol
             end
+            xit = xit[:,1:iterations]
             converged = true
             break
         # elseif  iterations > 0 && relerr <= opt.rtol 
@@ -184,6 +187,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
         else
             x .+= opt.solver.p
         end
+        xit[:,iterations+1] .= x
         ##########
 
         #Update function and gradient
@@ -215,5 +219,5 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
     stats.hvp_evals = Hv.nprod
     stats.run_time = elapsed(tic)
 
-    return stats, x
+    return stats, x, xit
 end
