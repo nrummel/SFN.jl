@@ -33,7 +33,7 @@ function minimize!(opt::O, x::S, f::F; itmax::I=1000, time_limit::T2=Inf) where 
 
     #OLD: Using Zygote
     # Hv = RHvpOperator(f, x, power=hvp_power(opt.solver))
-
+    
     # function fg!(grads::S, x::S)
         
     #     fval, back = let f=f; pullback(f, x) end
@@ -156,6 +156,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         if opt.linesearch && !search!(opt, stats, x, f, fval, grads, g_norm, Hv)
             break
         else
+            println("P-norm: ", norm(opt.solver.p))
             x .+= opt.solver.p
         end
         ##########

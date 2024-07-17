@@ -6,6 +6,7 @@ Autodiff Hvp benchmarks.
 
 using SFN
 using BenchmarkTools
+using Enzyme: hvp!
 
 function rosenbrock(x)
     res = 0.0
@@ -29,6 +30,12 @@ println()
 
 #Enzyme
 t = @benchmark ehvp!($result, $rosenbrock, $x, v) setup=(v=randn(dim))
+println("Enzyme func")
+display(t)
+println()
+
+#Enzyme
+t = @benchmark hvp!($result, $rosenbrock, $x, v) setup=(v=randn(dim))
 println("Enzyme func")
 display(t)
 println()
