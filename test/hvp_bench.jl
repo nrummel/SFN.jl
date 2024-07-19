@@ -4,7 +4,7 @@ Author: Cooper Simpson
 Autodiff Hvp benchmarks.
 =#
 
-using SFN
+using QuasiNewton
 using BenchmarkTools
 using Enzyme: hvp!
 

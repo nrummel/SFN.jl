@@ -4,9 +4,9 @@ authors:
 - family-names: "Simpson"
   given-names: "Cooper"
   orcid: "https://orcid.org/0000-0003-3922-2797"
-title: "RandNLA.jl"
+title: "QuasiNewton.jl"
 version: 0.0.0
 doi: 10.1/2
 date-released: 2022
 url: "https://github.com/rs-coop/SFN.jl"
-note: "Julia implementation of Saddle-Free Newton type methods"
+note: "Julia implementation of Newton-type optimization methods"

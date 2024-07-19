@@ -1,16 +1,8 @@
-# SFN.jl
+# QuasiNewton
 
-## Saddle-Free Newton
+A collection of Newton-type optimization algorithms.
 
 ### Authors: [Cooper Simpson](https://rs-coop.github.io/)
-
-A Julia implementation of the R-SFN algorithm: a second-order method for unconstrained non-convex optimization. To that end, we consider a problem of the following form
-$$\min_{\mathbf{x}\in \mathbb{R}^n}f(\mathbf{x})$$
-where $f:\mathbb{R}^n\to\mathbb{R}$ is a twice continuously differentiable function. Each iteration applies an update of the following form:
-$$\mathbf{x}^{(k+1)} = \mathbf{x}^{(k)}-\Big(\big(\nabla^2f(\mathbf{x}^{(k)})\big)^2+\lambda^{(k)}\mathbf{I}\Big)^{-1/2} \nabla f(\mathbf{x}^{(k)})$$
-where the regularization term is $\lambda^{(k)}\propto||\nabla^2f(\mathbf{x}^{(k)})||$. The matrix inverse square root is computed via a quadrature approximation of the following integral:
-$$\mathbf{A}^{-1/2}=\frac{2}{\pi}\int_{0}^{\infty}\big(t^2\mathbf{I}+\mathbf{A}\big)^{-1}\ dt$$
-where $\mathbf{A}\in\mathbb{R}^{n\times n}$ has strictly positive spectrum, i.e $\sigma(\mathbf{A})\subset\mathbb{R}_{+ +}$.
 
 ## License & Citation
 All source code is made available under an MIT license. You can freely use and modify the code, without warranty, so long as you provide attribution to the authors. See `LICENSE` for the full text.
@@ -20,10 +12,10 @@ This repository can be cited using the GitHub action in the sidebar, or using th
 ## Installation
 This package can be installed just like any other Julia package. From the terminal, after starting the Julia REPL, run the following:
 ```julia
-julia> ]
-pkg> add RSFN
+using Pkg
+Pkg.add("QuasiNewton")
 ```
-This will install R-SFN and its direct dependencies, but in order to use the package you must install one of the following sets of packages for automatic differentiation (AD):
+This will install the package and its direct dependencies, but in order to use the package you must install one of the following sets of packages for automatic differentiation (AD):
 - `Enzyme.jl`
 - `ReverseDiff.jl` and `ForwardDiff.jl`
 - `Zygote.jl` and `ForwardDiff.jl`
@@ -32,13 +24,13 @@ This will install R-SFN and its direct dependencies, but in order to use the pac
 To test the package, run the following command in the REPL:
 ```julia
 using Pkg
-Pkg.test(test_args=[<specific tests>])
+Pkg.test(test_args=["optional specific tests"])
 ```
 
 ## Usage
 Load the package as usual:
 ```julia
-using RSFN
+using QuasiNewton
 ```
 which will export the struct `RSFNOptimizer` and the `minimize!` function. Then load your AD packages, which will export a subtype of `HvpOperator`. Say you load Enzyme:
 ```julia

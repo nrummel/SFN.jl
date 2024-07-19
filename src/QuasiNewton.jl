@@ -3,7 +3,7 @@ Author: Cooper Simpson
 
 CubicNewton optimization package.
 =#
-module SFN
+module QuasiNewton
 
 #=
 Setup

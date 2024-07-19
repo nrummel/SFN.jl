@@ -4,7 +4,7 @@ Author: Cooper Simpson
 SFN tests, specific tests runnable with Pkg.test(test_args=["target"])
 =#
 using Test
-using SFN
+using QuasiNewton
 
 if isempty(ARGS) || "all" in ARGS
     run_all = true

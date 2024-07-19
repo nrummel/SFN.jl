@@ -4,7 +4,7 @@ Author: Cooper Simpson
 Enzyme AD.
 =#
 
-using SFN: HvpOperator
+using QuasiNewton: HvpOperator
 using Enzyme
 
 export ehvp, ehvp!, EHvpOperator
