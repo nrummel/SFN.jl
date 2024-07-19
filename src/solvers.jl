@@ -81,25 +81,24 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cg_rtol = sqrt(eps(T))
 
     #CG solves
-    # cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
-    # converged = sum(solver.krylov_solver.converged)
-    # if converged != length(shifts)
-    #     println("WARNING: Solver failed, only ", converged, " converged")
-    # end
+    converged = sum(solver.krylov_solver.converged)
+    if converged != length(shifts)
+        println("WARNING: Solver failed, only ", converged, " converged")
+    end
 
-    # push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+    push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     #Update search direction
-    # for i in eachindex(shifts)
-    #     @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i] #NOTE: Should we multiply by c outside of loop?
-    #     # @inbounds solver.p -= solver.quad_weights[i]*((Matrix(Hv)+shifts[i]*I)\(g ./g_norm))
-    # end
+    for i in eachindex(shifts)
+        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i] #NOTE: Should we multiply by c outside of loop?
+        # @inbounds solver.p -= solver.quad_weights[i]*((Matrix(Hv)+shifts[i]*I)\(g ./g_norm))
+    end
 
-    solver.p .-= sqrt(Matrix(Hv)+λ*I)\g
     # solver.p .*= g_norm
 
-    # solver.p .*= c
+    solver.p .*= c
 
     return
 end
@@ -286,6 +285,34 @@ function step!(solver::EigenSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, 
     mul!(cache, E.vectors', -g)
     @. cache *= E.values
     mul!(solver.p, E.vectors, cache)
+
+    return
+end
+
+########################################################
+
+#=
+Direct inverse square-root solver.
+=#
+mutable struct DirectSolver{T<:AbstractFloat, S<:AbstractVector{T}}
+    p::S #search direction
+end
+
+function hvp_power(solver::DirectSolver)
+    return 2
+end
+
+function DirectSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    return DirectSolver(type(undef, dim))
+end
+
+function step!(solver::DirectSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, M*g_norm), 1e-15)
+
+    #Update search direction
+    solver.p .-= sqrt(Matrix(Hv)+λ*I)\g
 
     return
 end
