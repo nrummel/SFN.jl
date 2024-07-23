@@ -87,7 +87,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
     tic = time_ns()
     
     #Stats
-    stats = Stats(T)
+    stats = O <: ARCOptimizer ? ARCStats(T) : Stats(T)
     converged = false
     iterations = 0
     
@@ -136,8 +136,8 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
             @info "  x = $(xRnd)"
         end
     end
-    xit = zeros(eltype(x), length(x), itmax+1)
-    xit[:,1] .= x
+    xit = zeros(eltype(x), length(x), 0)
+    xit = hcat(xit, x)
     # xᵢ₋₁ = copy(x)
     while iterations<itmax+1
         #Check gradient norm
@@ -149,12 +149,11 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
                 @info "Converged! ||∇f|| ≤ ϵ"
                 @info @sprintf "  %.2e ≤ %.2e" g_norm tol
             end
-            xit = xit[:,1:iterations]
             converged = true
             break
         # elseif  iterations > 0 && relerr <= opt.rtol 
         #     if show_trace
-        #         @info "Converged!  ||x - xᵢ₋₁||₂ / ||xᵢ₋₁||₂ ≤ ϵᵣ"
+        #         @info "Converged!  ||xᵢ - xᵢ₋₁||₂ / ||xᵢ₋₁||₂ ≤ ϵᵣ"
         #         @info @sprintf "%.2e ≤ %.2e" relerr opt.rtol
         #     end
         #     break
@@ -167,6 +166,10 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
             break
         elseif iterations==itmax
             stats.status = "Maximum iterations exceeded"
+            break
+        elseif O <: ARCOptimizer && stats.unsuccessful_iters >= 50
+            @info "here" 
+            stats.status = "50 unsucessful iters in a row"
             break
         end
 
@@ -187,7 +190,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T, 
         else
             x .+= opt.solver.p
         end
-        xit[:,iterations+1] .= x
+        xit = hcat(xit, x)
         ##########
 
         #Update function and gradient

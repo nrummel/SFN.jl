@@ -85,7 +85,7 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function search!(opt::ARCOptimizer, stats::ARCStats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
     
     #Cubic sub-problem
     cubic_subprob = (d) -> begin
@@ -106,15 +106,15 @@ function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
 
     j = argmin(abs.(opt.M*opt.solver.shifts[i:end]-norm.(opt.solver.krylov_solver.x[i:end]))) + i-1
 
-    while !success && !shift_failure
+    while !success && !shift_failure && stats.unsuccessful_iters < 50
         stats.f_evals += 1
 
         ρ = (fval - f(x + opt.solver.krylov_solver.x[j]))/(fval - cubic_subprob(opt.solver.krylov_solver.x[j]))
 
         #unsuccessful
         if ρ < opt.η1
+            stats.unsuccessful_iters += 1
             M_new = opt.M
-
             while M_new > opt.γ1*opt.M
                 if j == length(opt.solver.shifts)
                     stats.status = "No next shift"
@@ -124,9 +124,9 @@ function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
                 M_new = norm(opt.solver.krylov_solver.x[j+1])/opt.solver.shifts[j+1]
                 j += 1
             end
-            
         #successful
         else
+            stats.unsuccessful_iters = 0
             success = true
 
             #step
